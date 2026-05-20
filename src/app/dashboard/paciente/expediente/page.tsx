@@ -1,85 +1,246 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/utils/supabase/client";
 
 export default function ExpedienteMedico() {
-  const historial = [
-    { date: "15 OCT 2023", doc: "Dr. Eduardo Ramírez", spec: "Cardiología", reason: "Revisión de presión arterial", icon: "ecg", color: "[#00a3ad]" },
-    { date: "02 SEP 2023", doc: "Dra. Ana López", spec: "Medicina General", reason: "Chequeo anual", icon: "stethoscope", color: "[#7df4ff]" },
-    { date: "12 JUL 2023", doc: "Laboratorios Central", spec: "Estudios clínicos", reason: "Estudios de sangre", icon: "biotech", color: "[#62d8da]" }
-  ];
+  const supabase = createClient();
+  const [paciente, setPaciente] = useState<any>(null);
+  const [consultas, setConsultas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Cargar datos del paciente
+      const { data: userData } = await supabase
+        .from("usuarios")
+        .select("nombre, apellidos, telefono, correo, pacientes(fecha_nacimiento)")
+        .eq("id", user.id)
+        .single();
+
+      if (userData) setPaciente(userData);
+
+      // Cargar expediente y consultas
+      const { data: expData } = await supabase
+        .from("expedientes")
+        .select(`
+          id,
+          consultas(
+            id,
+            fecha_hora,
+            motivo,
+            receta,
+            citas(
+              fecha,
+              hora,
+              doctor:usuarios!doctor_id(nombre, apellidos, doctores(especialidades(nombre))),
+              consultorio:consultorios(nombre, sucursales(nombre))
+            )
+          )
+        `)
+        .eq("paciente_id", user.id)
+        .single();
+
+      if (expData?.consultas) {
+        // Ordenar consultas por fecha descendente
+        const sorted = [...expData.consultas].sort(
+          (a: any, b: any) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()
+        );
+        setConsultas(sorted);
+      }
+
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const calcEdad = (fechaNac?: string) => {
+    if (!fechaNac) return "—";
+    const birth = new Date(fechaNac);
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - birth.getFullYear();
+    if (hoy.getMonth() < birth.getMonth() || (hoy.getMonth() === birth.getMonth() && hoy.getDate() < birth.getDate())) {
+      edad--;
+    }
+    return `${edad} años`;
+  };
+
+  const formatFecha = (iso: string) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("es-MX", {
+      day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+  };
+
+  const pacData = paciente as any;
+  const fechaNac = pacData?.pacientes?.[0]?.fecha_nacimiento || pacData?.pacientes?.fecha_nacimiento;
 
   return (
-    <main className="pt-safe-24 pb-32 px-5 max-w-lg mx-auto space-y-8 relative z-10 w-full">
-      {/* Top Header handled by Layout, adding Title below */}
-      <div className="mb-8">
-        <h1 className="font-headline font-bold text-3xl tracking-tight text-white mb-2">Expediente Médico</h1>
-        <p className="text-white/70 text-sm">Consulta tus datos personales e historial de consultas.</p>
+    <main className="pb-32 px-5 max-w-lg mx-auto space-y-8 relative z-10 w-full" style={{ paddingTop: "1.5rem" }}>
+      <div className="mb-6">
+        <h1 className="font-headline font-bold text-3xl tracking-tight text-white mb-1">Expediente Médico</h1>
+        <p className="text-white/50 text-sm">Tu historial de consultas y datos personales.</p>
       </div>
 
-      {/* Sección Datos Personales */}
-      <section className="space-y-4">
+      {/* Datos Personales */}
+      <section className="space-y-3">
         <h2 className="font-headline font-extrabold text-white text-xl tracking-wide px-1">Datos Personales</h2>
-        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[24px] p-6 grid grid-cols-2 gap-6 relative overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 text-[var(--color-primary-container)]">
-              <span className="material-symbols-outlined text-[18px]">cake</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest opacity-80">Edad</span>
+        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[24px] p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2].map((n) => <div key={n} className="h-8 bg-white/5 animate-pulse rounded-xl" />)}
             </div>
-            <p className="text-white font-semibold text-lg">32 años</p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 text-[var(--color-primary-container)]">
-              <span className="material-symbols-outlined text-[18px]">bloodtype</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest opacity-80">Tipo</span>
+          ) : (
+            <div className="grid grid-cols-2 gap-6">
+              <div className="col-span-2">
+                <span className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Nombre completo</span>
+                <p className="text-white font-bold text-lg font-headline mt-0.5">
+                  {pacData ? `${pacData.nombre} ${pacData.apellidos}` : "—"}
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-cyan-400 mb-0.5">
+                  <span className="material-symbols-outlined text-sm">cake</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Edad</span>
+                </div>
+                <p className="text-white font-semibold">{calcEdad(fechaNac)}</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-cyan-400 mb-0.5">
+                  <span className="material-symbols-outlined text-sm">event</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Nacimiento</span>
+                </div>
+                <p className="text-white font-semibold text-sm">
+                  {fechaNac ? new Date(fechaNac + "T00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : "—"}
+                </p>
+              </div>
+              {pacData?.telefono && (
+                <div>
+                  <div className="flex items-center gap-1.5 text-cyan-400 mb-0.5">
+                    <span className="material-symbols-outlined text-sm">call</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest">Teléfono</span>
+                  </div>
+                  <p className="text-white font-semibold text-sm">{pacData.telefono}</p>
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-1.5 text-cyan-400 mb-0.5">
+                  <span className="material-symbols-outlined text-sm">mail</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Correo</span>
+                </div>
+                <p className="text-white/70 font-semibold text-xs">{pacData?.correo || "—"}</p>
+              </div>
+              <div className="col-span-2 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-1.5 text-cyan-400 mb-1">
+                  <span className="material-symbols-outlined text-sm">folder_shared</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Total de consultas</span>
+                </div>
+                <p className="text-white font-black text-2xl font-headline">{consultas.length}</p>
+              </div>
             </div>
-            <p className="text-white font-semibold text-lg">O+</p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 text-[var(--color-primary-container)]">
-              <span className="material-symbols-outlined text-[18px]">warning</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest opacity-80">Alergias</span>
-            </div>
-            <p className="text-white font-semibold text-lg">Ninguna</p>
-          </div>
-          <div className="col-span-2 pt-4 border-t border-white/10">
-            <div className="flex items-center gap-2 text-[var(--color-primary-container)] mb-1">
-              <span className="material-symbols-outlined text-[18px]">medical_information</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest opacity-80">Padecimientos Actuales</span>
-            </div>
-            <p className="text-white font-medium text-base">Hipertensión controlada</p>
-          </div>
+          )}
         </div>
       </section>
 
-      {/* Sección Historial de Consultas */}
+      {/* Historial de Consultas */}
       <section className="space-y-4">
         <div className="flex justify-between items-end px-1">
           <h2 className="font-headline font-extrabold text-white text-xl tracking-wide">Historial</h2>
-          <Link href="/dashboard/paciente/citas" className="text-[12px] font-bold text-[var(--color-primary-container)] uppercase tracking-tighter cursor-pointer hover:opacity-80 transition-opacity">
-            Ver todo
+          <Link href="/dashboard/paciente/citas" className="text-xs font-bold text-cyan-400 uppercase tracking-wider hover:opacity-80 transition-opacity">
+            Ver citas →
           </Link>
         </div>
-        
-        <div className="space-y-4">
-          {historial.map((item, idx) => (
-            <Link href={`/dashboard/paciente/expediente/${idx}`} key={idx} className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[24px] p-5 flex gap-4 items-start transition-all hover:bg-white/10 active:scale-95 cursor-pointer shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-              <div className="bg-[var(--color-primary-container)]/20 p-3 rounded-2xl">
-                <span className={`material-symbols-outlined text-${item.color}`}>{item.icon}</span>
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-bold text-[var(--color-primary-container)] opacity-80">{item.date}</span>
-                  <span className="material-symbols-outlined text-white/40 text-sm">chevron_right</span>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((n) => <div key={n} className="h-24 bg-white/5 animate-pulse rounded-[1.5rem]" />)}
+          </div>
+        ) : consultas.length === 0 ? (
+          <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[1.5rem]">
+            <span className="material-symbols-outlined text-4xl text-white/20">stethoscope</span>
+            <p className="text-white/40 text-sm mt-2">Aún no tienes consultas registradas.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {consultas.map((consulta: any) => {
+              const cita = consulta.citas;
+              const doc = cita?.doctor;
+              const con = cita?.consultorio;
+              const espInfo = doc?.doctores?.[0]?.especialidades || doc?.doctores?.especialidades;
+              const especialidad = espInfo?.nombre;
+              const isExpanded = expandedId === consulta.id;
+
+              return (
+                <div
+                  key={consulta.id}
+                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] overflow-hidden cursor-pointer"
+                  onClick={() => setExpandedId(isExpanded ? null : consulta.id)}
+                >
+                  <div className="p-5 flex gap-4 items-start hover:bg-white/5 transition-all">
+                    <div className="bg-cyan-500/10 border border-cyan-500/20 p-3 rounded-2xl shrink-0">
+                      <span className="material-symbols-outlined text-cyan-400">stethoscope</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <p className="text-[11px] font-bold text-cyan-300 uppercase tracking-widest mb-0.5">
+                            {formatFecha(consulta.fecha_hora)}
+                          </p>
+                          <h3 className="text-white font-bold font-headline">
+                            Dr. {doc ? `${doc.nombre} ${doc.apellidos}` : "—"}
+                          </h3>
+                          {especialidad && (
+                            <p className="text-white/50 text-xs font-semibold uppercase tracking-wide">{especialidad}</p>
+                          )}
+                        </div>
+                        <span className={`material-symbols-outlined text-white/30 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                          expand_more
+                        </span>
+                      </div>
+                      {consulta.motivo && (
+                        <p className="text-white/60 text-sm mt-2 italic line-clamp-2">"{consulta.motivo}"</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expandido: receta y detalles */}
+                  {isExpanded && (
+                    <div className="px-5 pb-5 border-t border-white/5 pt-4 space-y-4">
+                      {con && (
+                        <div>
+                          <span className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Consultorio</span>
+                          <p className="text-white/70 text-sm mt-0.5">
+                            {con.nombre}{con.sucursales?.nombre && ` · ${con.sucursales.nombre}`}
+                          </p>
+                        </div>
+                      )}
+                      {consulta.motivo && (
+                        <div>
+                          <span className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Motivo</span>
+                          <p className="text-white/80 text-sm mt-0.5">{consulta.motivo}</p>
+                        </div>
+                      )}
+                      {consulta.receta && (
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="material-symbols-outlined text-emerald-400 text-sm">medication</span>
+                            <span className="text-[10px] text-emerald-300 uppercase font-bold tracking-widest">Receta / Indicaciones</span>
+                          </div>
+                          <p className="text-white/80 text-sm leading-relaxed">{consulta.receta}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <h3 className="text-white font-bold text-md leading-tight">{item.doc}</h3>
-                <p className="text-white/60 text-xs font-medium uppercase tracking-wide">{item.spec}</p>
-                <p className="text-white/80 text-sm mt-2 italic">"{item.reason}"</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </main>
   );

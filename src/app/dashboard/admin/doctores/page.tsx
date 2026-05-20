@@ -1,19 +1,139 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-
-const especialidades = ["Cardiología", "Pediatría", "Dermatología", "Neurología", "Ginecología"];
+import { createClient } from "@/utils/supabase/client";
 
 export default function AdminRegistroDoctores() {
-  const [selectedEsp, setSelectedEsp] = useState("Cardiología");
+  const supabase = createClient();
+  const [specialties, setSpecialties] = useState<any[]>([]);
+  
+  // Estados del formulario
+  const [nombre, setNombre] = useState("");
+  const [apellidos, setApellidos] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [especialidadId, setEspecialidadId] = useState("");
+  const [precioConsulta, setPrecioConsulta] = useState("500");
+  
+  // Estados del sistema
   const [showPass, setShowPass] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  
+  // Listado de doctores
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // 1. Cargar especialidades y lista de doctores al iniciar
+  const loadData = async () => {
+    setLoadingList(true);
+    try {
+      // Cargar especialidades
+      const { data: espData, error: espErr } = await supabase
+        .from("especialidades")
+        .select("*")
+        .order("nombre", { ascending: true });
+
+      if (espErr) console.error("Error cargando especialidades:", espErr.message);
+      else {
+        setSpecialties(espData || []);
+        if (espData && espData.length > 0) {
+          setEspecialidadId(espData[0].id.toString());
+        }
+      }
+
+      // Cargar lista de doctores
+      const res = await fetch("/api/admin/doctores");
+      const result = await res.json();
+      if (result.success) {
+        setDoctorsList(result.doctors || []);
+      } else {
+        console.error("Error al cargar doctores:", result.error);
+      }
+    } catch (err) {
+      console.error("Error de conexión:", err);
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // 2. Manejo de Registro
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+    setErrorMsg("");
+    setSuccessMsg("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/admin/doctores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre,
+          apellidos,
+          correo,
+          username,
+          password,
+          telefono,
+          especialidad_id: especialidadId,
+          precio_consulta: precioConsulta,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "No se pudo registrar el doctor.");
+      }
+
+      setSuccessMsg("✓ Médico registrado exitosamente.");
+      
+      // Limpiar formulario
+      setNombre("");
+      setApellidos("");
+      setCorreo("");
+      setUsername("");
+      setPassword("");
+      setTelefono("");
+      
+      // Recargar lista de doctores
+      loadData();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Ocurrió un error inesperado.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Manejo de Eliminación
+  const handleDelete = async (id: string, nombreDoc: string) => {
+    const confirm = window.confirm(`¿Estás seguro de que deseas eliminar la cuenta del doctor ${nombreDoc}? Esta acción no se puede deshacer.`);
+    if (!confirm) return;
+
+    try {
+      const res = await fetch(`/api/admin/doctores?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "No se pudo eliminar el doctor.");
+      }
+
+      setSuccessMsg("✓ Profesional eliminado correctamente de Supabase.");
+      loadData();
+    } catch (err: any) {
+      setErrorMsg(err.message || "No se pudo eliminar el doctor.");
+    }
   };
 
   return (
@@ -29,96 +149,235 @@ export default function AdminRegistroDoctores() {
         </div>
       </header>
 
-      <main className="relative z-10 pt-safe-24 pb-32 px-6 max-w-4xl mx-auto">
+      <main className="relative z-10 pt-24 pb-32 px-6 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          {/* Context Hero */}
-          <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/30 text-cyan-400 w-fit" style={{ background: "rgba(0,163,173,0.1)", backdropFilter: "blur(24px)" }}>
-              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>medical_services</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest">Portal Administrativo</span>
-            </div>
-            <h2 className="text-4xl font-headline font-extrabold text-white leading-tight">
-              Expanda su <span className="text-[#00a3ad]">equipo médico</span>
-            </h2>
-            <p className="text-slate-300 text-lg leading-relaxed font-light">
-              Añada nuevos profesionales a la red de NexusSalud manteniendo los más altos estándares de seguridad y precisión digital.
-            </p>
-          </div>
-
-          {/* Form */}
-          <div className="lg:col-span-7">
+          
+          {/* Formulario (Columna izquierda) */}
+          <div className="lg:col-span-5">
             <div className="p-8 md:p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden" style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#006970]/20 rounded-full blur-[80px]"></div>
-              {success && (
-                <div className="mb-4 bg-green-500/20 border border-green-500/40 text-green-300 text-sm font-semibold px-4 py-3 rounded-2xl text-center">
-                  ✓ Profesional registrado exitosamente
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#00a3ad]/10 rounded-full blur-[80px]"></div>
+              
+              <h2 className="text-2xl font-bold font-headline text-white mb-6">Nuevo Profesional</h2>
+              
+              {successMsg && (
+                <div className="mb-6 bg-green-500/20 border border-green-500/40 text-green-300 text-sm font-semibold px-4 py-3 rounded-2xl text-center">
+                  {successMsg}
                 </div>
               )}
-              <form className="space-y-6 relative z-10" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {[{ label: "Nombre", placeholder: "Ej. Ricardo" }, { label: "Apellido", placeholder: "Ej. Milla" }].map((f) => (
-                    <div key={f.label} className="space-y-2">
-                      <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">{f.label}</label>
-                      <input
-                        className="w-full px-5 py-4 rounded-2xl text-white placeholder-slate-500 outline-none focus:border-[#00a3ad]"
-                        placeholder={f.placeholder}
-                        type="text"
-                        style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)", transition: "all 0.3s ease" }}
-                      />
-                    </div>
-                  ))}
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Teléfono</label>
-                    <input className="w-full px-5 py-4 rounded-2xl text-white placeholder-slate-500 outline-none" placeholder="+52 000 000 0000" type="tel" style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }} />
+              {errorMsg && (
+                <div className="mb-6 bg-red-500/20 border border-red-500/40 text-red-300 text-sm font-semibold px-4 py-3 rounded-2xl text-center">
+                  {errorMsg}
+                </div>
+              )}
+
+              <form className="space-y-4 relative z-10" onSubmit={handleSubmit}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Nombre</label>
+                    <input
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none focus:border-[#00a3ad]"
+                      placeholder="Ricardo"
+                      type="text"
+                      required
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Edad</label>
-                    <input className="w-full px-5 py-4 rounded-2xl text-white placeholder-slate-500 outline-none" placeholder="35" type="number" style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Apellido</label>
+                    <input
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none focus:border-[#00a3ad]"
+                      placeholder="Milla"
+                      type="text"
+                      required
+                      value={apellidos}
+                      onChange={(e) => setApellidos(e.target.value)}
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Correo Electrónico</label>
+                  <input
+                    className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
+                    placeholder="doctor@nexussalud.app"
+                    type="email"
+                    required
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">ID Usuario (Login)</label>
+                    <input
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
+                      placeholder="doctor_carlos"
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Teléfono</label>
+                    <input
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
+                      placeholder="5512345678"
+                      type="tel"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Contraseña</label>
                   <div className="relative">
-                    <input className="w-full px-5 py-4 rounded-2xl text-white placeholder-slate-500 outline-none" placeholder="••••••••" type={showPass ? "text" : "password"} style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }} />
-                    <button type="button" onClick={() => setShowPass(!showPass)} className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-cyan-400 transition-colors">
+                    <input
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
+                      placeholder="••••••••"
+                      required
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    />
+                    <button type="button" onClick={() => setShowPass(!showPass)} className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-400 transition-colors">
                       {showPass ? "visibility_off" : "visibility"}
                     </button>
                   </div>
                 </div>
 
-                {/* Specialty Selector */}
-                <div className="space-y-4 pt-2">
-                  <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Asignación de Especialidad</label>
-                  <div className="flex flex-wrap gap-2">
-                    {especialidades.map((esp) => (
-                      <button
-                        key={esp}
-                        type="button"
-                        onClick={() => setSelectedEsp(esp)}
-                        className="px-5 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95"
-                        style={selectedEsp === esp
-                          ? { background: "rgba(0,163,173,0.1)", border: "1px solid rgba(0,204,217,0.3)", color: "#67e8f9", backdropFilter: "blur(24px)" }
-                          : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8" }
-                        }
-                      >
-                        {esp}
-                      </button>
-                    ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Especialidad</label>
+                    <select
+                      className="w-full px-4 py-3.5 rounded-2xl text-white bg-cyan-950/80 outline-none border border-white/10"
+                      value={especialidadId}
+                      onChange={(e) => setEspecialidadId(e.target.value)}
+                      required
+                    >
+                      {specialties.length === 0 ? (
+                        <option value="" disabled>Cargando especialidades...</option>
+                      ) : (
+                        specialties.map((esp) => (
+                          <option key={esp.id} value={esp.id} className="bg-cyan-950 text-white">
+                            {esp.nombre}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Precio Consulta ($)</label>
+                    <input
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
+                      placeholder="500"
+                      type="number"
+                      required
+                      value={precioConsulta}
+                      onChange={(e) => setPrecioConsulta(e.target.value)}
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    />
                   </div>
                 </div>
 
-                <div className="pt-6">
-                  <button type="submit" className="w-full bg-[#00a3ad] text-white font-headline font-extrabold py-5 rounded-2xl shadow-[0_10px_30px_rgba(0,163,173,0.3)] hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-3 group">
-                    <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">person_add</span>
-                    Registrar Profesional
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-[#00a3ad] disabled:bg-slate-700 text-white font-headline font-extrabold py-4 rounded-2xl shadow-[0_10px_30px_rgba(0,163,173,0.3)] hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                  >
+                    <span className="material-symbols-outlined">{loading ? "hourglass_empty" : "person_add"}</span>
+                    {loading ? "Registrando..." : "Registrar Profesional"}
                   </button>
                 </div>
               </form>
             </div>
+          </div>
+
+          {/* Listado de Doctores (Columna derecha) */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold font-headline text-white">Directorio Médico</h2>
+                <p className="text-slate-400 text-sm">Doctores registrados en tiempo real</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadData}
+                className="material-symbols-outlined text-cyan-400 p-2 hover:bg-white/5 rounded-full border border-white/5 active:scale-95 transition-all"
+              >
+                refresh
+              </button>
+            </div>
+
+            {loadingList ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-24 w-full bg-white/5 animate-pulse rounded-[1.5rem] border border-white/10"></div>
+                ))}
+              </div>
+            ) : doctorsList.length === 0 ? (
+              <div className="rounded-[1.5rem] p-10 text-center border border-white/10 bg-white/5">
+                <span className="material-symbols-outlined text-cyan-400 text-5xl mb-4">medical_services</span>
+                <h3 className="font-bold text-white mb-2">No hay médicos registrados</h3>
+                <p className="text-slate-400 text-sm">Completa el formulario de la izquierda para registrar el primer profesional.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 max-h-[680px] overflow-y-auto pr-2">
+                {doctorsList.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="rounded-[1.5rem] p-5 flex items-center justify-between transition-all hover:bg-white/5 border border-white/10 bg-white/5"
+                    style={{ backdropFilter: "blur(20px)" }}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                        <span className="material-symbols-outlined">doctor</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-white font-headline">
+                          Dr. {doc.nombre} {doc.apellidos}
+                        </h3>
+                        <p className="text-xs text-cyan-300 font-semibold tracking-wider uppercase mb-1">
+                          {doc.especialidad_nombre}
+                        </p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">badge</span> {doc.usuario}
+                          </span>
+                          {doc.telefono && (
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">call</span> {doc.telefono}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 font-bold text-emerald-400">
+                            <span className="material-symbols-outlined text-xs text-emerald-400">payments</span> ${doc.precio_consulta} MXN
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(doc.id, `${doc.nombre} ${doc.apellidos}`)}
+                      className="w-10 h-10 rounded-full flex items-center justify-center border border-red-500/20 text-red-400 bg-red-950/20 hover:bg-red-500 hover:text-white transition-all active:scale-95 duration-200"
+                    >
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </main>

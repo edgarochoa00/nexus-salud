@@ -51,13 +51,8 @@ export default function UniversalLogin() {
         return;
       }
 
-      // 3. Obtener rol y redirigir
-      const { data: perfil } = await supabase
-        .from("usuarios")
-        .select("rol")
-        .eq("id", data.user.id)
-        .single();
-
+      // 3. Obtener rol desde user_metadata (ya viene en el JWT — sin delay de RLS)
+      //    Solo consultar la tabla si el metadata no tiene el rol.
       const rutasPorRol: Record<string, string> = {
         admin: "/dashboard/admin",
         doctor: "/dashboard/doctor",
@@ -65,8 +60,22 @@ export default function UniversalLogin() {
         paciente: "/dashboard/paciente",
       };
 
-      // Si no hay perfil todavía, ir a paciente por defecto
-      const destino = rutasPorRol[perfil?.rol ?? "paciente"] ?? "/dashboard/paciente";
+      // Leer rol desde metadata del token (instantáneo, sin RLS)
+      let rol: string | null = data.user.user_metadata?.rol ?? null;
+
+      // Si el metadata no trae el rol, consultar la tabla como respaldo
+      if (!rol) {
+        const { data: perfil } = await supabase
+          .from("usuarios")
+          .select("rol")
+          .eq("id", data.user.id)
+          .single();
+        rol = perfil?.rol ?? null;
+      }
+
+      console.log("[Login] Usuario:", data.user.email, "| Rol detectado:", rol);
+
+      const destino = rutasPorRol[rol ?? "paciente"] ?? "/dashboard/paciente";
       router.push(destino);
 
     } catch (err) {

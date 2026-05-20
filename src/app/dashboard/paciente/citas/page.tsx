@@ -3,117 +3,241 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
-import type { Cita } from "@/types/supabase";
 
 export default function MisCitasList() {
   const supabase = createClient();
-  const [appointments, setAppointments] = useState<Cita[]>([]);
+  const [citas, setCitas] = useState<any[]>([]);
+  const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vista, setVista] = useState<"proximas" | "historial">("proximas");
+  const [successMsg, setSuccessMsg] = useState("");
 
-  const fetchCitas = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data } = await supabase
-      .from("citas")
-      .select("*, doctor:perfiles!doctor_id(nombre)")
-      .eq("paciente_id", user.id)
-      .in("estado", ["pendiente", "confirmada"])
-      .order("fecha", { ascending: true });
+    const hoy = new Date().toISOString().split("T")[0];
 
-    setAppointments((data as Cita[]) ?? []);
-    setLoading(false);
-  }, [supabase]);
+    const [citasRes, notifsRes] = await Promise.all([
+      supabase
+        .from("citas")
+        .select(`
+          id, fecha, hora, estado,
+          doctor:usuarios!doctor_id(nombre, apellidos, doctores(especialidades(nombre))),
+          consultorio:consultorios(nombre, sucursales(nombre)),
+          pagos(folio, monto_total, estatus)
+        `)
+        .eq("paciente_id", user.id)
+        .order("fecha", { ascending: vista === "proximas" }),
+        supabase
+        .from("notificaciones")
+        .select("*")
+        .eq("paciente_id", user.id)
+        .eq("leida", false)
+        .order("fecha", { ascending: false })
+        .limit(5),
+    ]);
 
-  useEffect(() => { fetchCitas(); }, [fetchCitas]);
-
-  const handleCancel = async (id: string) => {
-    if (!window.confirm("¿Seguro que deseas cancelar esta cita?")) return;
-
-    const { error } = await supabase
-      .from("citas")
-      .update({ estado: "cancelada" })
-      .eq("id", id);
-
-    if (error) {
-      alert("Error al cancelar: " + error.message);
+    let data = citasRes.data || [];
+    if (vista === "proximas") {
+      data = data.filter((c: any) => c.fecha >= hoy && ["pendiente", "confirmada"].includes(c.estado));
     } else {
-      alert("Cita cancelada con éxito.");
-      fetchCitas();
+      data = data.filter((c: any) => c.fecha < hoy || ["completada", "cancelada"].includes(c.estado));
+    }
+
+    setCitas(data);
+    setNotificaciones(notifsRes.data || []);
+    setLoading(false);
+  }, [supabase, vista]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleCancelar = async (id: number) => {
+    if (!window.confirm("¿Seguro que deseas cancelar esta cita?")) return;
+    const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
+    if (error) alert("Error: " + error.message);
+    else {
+      setSuccessMsg("Cita cancelada. Recibirás una notificación de confirmación.");
+      setTimeout(() => setSuccessMsg(""), 4000);
+      fetchData();
     }
   };
 
-  return (
-    <main className="relative z-10 px-6 pt-safe-24 pb-32 max-w-4xl mx-auto w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-extrabold text-white font-headline tracking-tight mb-2">Mis Citas</h2>
-        <p className="text-white/70 text-sm">Gestiona tus consultas programadas y revisa el historial.</p>
-      </div>
+  const marcarLeidas = async () => {
+    const ids = notificaciones.map((n: any) => n.id);
+    if (ids.length === 0) return;
+    await supabase.from("notificaciones").update({ leida: true }).in("id", ids);
+    setNotificaciones([]);
+  };
 
-      <div className="space-y-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-[var(--color-primary-fixed)] font-headline">Citas Programadas</h3>
-          <div className="flex gap-2">
-            <span className="px-3 py-1 bg-[var(--color-primary-container)]/30 text-[var(--color-primary-fixed)] rounded-full text-xs font-bold uppercase tracking-widest">Próximas</span>
-            <Link href="/dashboard/paciente/expediente" className="px-3 py-1 bg-white/5 text-white/40 rounded-full text-xs font-bold uppercase tracking-widest hover:text-white cursor-pointer transition-colors">
-              Historial
-            </Link>
+  const estadoBadge = (estado: string) => {
+    const map: Record<string, { color: string; label: string }> = {
+      pendiente: { color: "text-amber-300 bg-amber-500/10 border-amber-500/30", label: "Pendiente" },
+      confirmada: { color: "text-cyan-300 bg-cyan-500/10 border-cyan-500/30", label: "Confirmada" },
+      completada: { color: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30", label: "Completada" },
+      cancelada: { color: "text-red-300 bg-red-500/10 border-red-500/30", label: "Cancelada" },
+      no_asistio: { color: "text-slate-400 bg-slate-500/10 border-slate-500/30", label: "No asistió" },
+    };
+    return map[estado] || { color: "text-white/40", label: estado };
+  };
+
+  return (
+    <main className="relative z-10 px-6 pb-32 max-w-4xl mx-auto w-full" style={{ paddingTop: "1.5rem" }}>
+      
+      {/* Notificaciones no leídas */}
+      {notificaciones.length > 0 && (
+        <div className="mb-6 bg-cyan-500/10 border border-cyan-500/30 rounded-[1.5rem] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-cyan-400 text-sm">notifications</span>
+              <span className="text-xs font-bold text-cyan-300 uppercase tracking-widest">Notificaciones nuevas</span>
+            </div>
+            <button type="button" onClick={marcarLeidas} className="text-xs text-white/40 hover:text-white transition-colors">
+              Marcar todas como leídas
+            </button>
+          </div>
+          <div className="space-y-2">
+            {notificaciones.map((n: any) => (
+              <p key={n.id} className="text-sm text-white/70 bg-white/5 rounded-xl px-3 py-2">
+                {n.mensaje}
+              </p>
+            ))}
           </div>
         </div>
+      )}
 
-        {loading ? (
-          <div className="text-center py-12">
-            <span className="material-symbols-outlined text-4xl text-white/20 animate-spin">progress_activity</span>
-            <p className="text-white/50 mt-2 text-sm">Cargando citas...</p>
-          </div>
-        ) : appointments.length === 0 ? (
-          <div className="text-center py-12 bg-white/5 rounded-[2rem] border border-white/10">
-            <span className="material-symbols-outlined text-4xl text-white/20">event_busy</span>
-            <p className="text-white/60 text-sm mt-2">No tienes citas próximas.</p>
-            <Link href="/dashboard/paciente/agendar" className="inline-block mt-4 px-6 py-2 rounded-full bg-[var(--color-primary-container)] text-white text-sm font-bold">
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-3xl font-extrabold text-white font-headline tracking-tight">Mis Citas</h2>
+        <p className="text-white/50 text-sm mt-1">Gestiona tus consultas y revisa tu historial.</p>
+      </div>
+
+      {successMsg && (
+        <div className="mb-4 bg-green-500/20 border border-green-500/40 text-green-300 text-sm font-semibold px-4 py-3 rounded-2xl">
+          {successMsg}
+        </div>
+      )}
+
+      {/* Tabs Vista */}
+      <div className="flex items-center gap-2 mb-6">
+        {(["proximas", "historial"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setVista(v)}
+            className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${
+              vista === v
+                ? "bg-[var(--color-primary-container,#00a3ad)] text-white shadow-md"
+                : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+            }`}
+          >
+            {v === "proximas" ? "Próximas" : "Historial"}
+          </button>
+        ))}
+        <Link
+          href="/dashboard/paciente/agendar"
+          className="ml-auto px-5 py-2 rounded-full text-sm font-bold bg-white/10 text-white/70 border border-white/10 hover:bg-white/20 transition-all flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-sm">add</span>
+          Agendar
+        </Link>
+      </div>
+
+      {/* Lista */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((n) => <div key={n} className="h-28 bg-white/5 animate-pulse rounded-[1.5rem] border border-white/10" />)}
+        </div>
+      ) : citas.length === 0 ? (
+        <div className="text-center py-12 bg-white/5 rounded-[2rem] border border-white/10">
+          <span className="material-symbols-outlined text-4xl text-white/20">event_busy</span>
+          <p className="text-white/50 text-sm mt-2">
+            {vista === "proximas" ? "No tienes citas próximas." : "No hay historial de citas."}
+          </p>
+          {vista === "proximas" && (
+            <Link href="/dashboard/paciente/agendar" className="inline-block mt-4 px-6 py-2 rounded-full bg-[var(--color-primary-container,#00a3ad)] text-white text-sm font-bold">
               Agendar ahora
             </Link>
-          </div>
-        ) : (
-          appointments.map((appt) => (
-            <div key={appt.id} className="bg-white/5 backdrop-blur-2xl border border-white/10 p-6 rounded-[2rem] flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all duration-300 hover:bg-white/10 group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-              <div className="flex items-center gap-6">
-                <div className="flex flex-col items-center justify-center bg-[var(--color-primary-container)]/20 p-4 rounded-2xl min-w-[80px]">
-                  <span className="text-[var(--color-primary-fixed)] font-bold text-xl font-headline">
-                    {new Date(appt.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
-                  </span>
-                  <span className="text-white/60 text-xs font-bold uppercase">{appt.hora?.slice(0, 5)}</span>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {citas.map((cita: any) => {
+            const doc = cita.doctor;
+            const con = cita.consultorio;
+            const pago = cita.pagos?.[0];
+            const espInfo = doc?.doctores?.[0]?.especialidades || doc?.doctores?.especialidades;
+            const especialidad = espInfo?.nombre;
+            const badge = estadoBadge(cita.estado);
+
+            return (
+              <div
+                key={cita.id}
+                className="bg-white/5 backdrop-blur-2xl border border-white/10 p-5 rounded-[2rem] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:bg-white/8 group"
+              >
+                <div className="flex items-center gap-5">
+                  {/* Fecha */}
+                  <div className="flex flex-col items-center justify-center bg-white/5 border border-white/10 p-3 rounded-2xl min-w-[72px] text-center">
+                    <span className="text-white/60 font-bold text-xs uppercase">
+                      {new Date(cita.fecha + "T00:00").toLocaleDateString("es-MX", { month: "short" })}
+                    </span>
+                    <span className="text-white font-black text-2xl leading-none font-headline">
+                      {new Date(cita.fecha + "T00:00").getDate()}
+                    </span>
+                    <span className="text-white/40 text-xs font-bold">{cita.hora?.slice(0, 5)}</span>
+                  </div>
+
+                  {/* Info */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                      {pago && (
+                        <span className="text-[10px] font-bold text-white/40">
+                          ${pago.monto_total} · {pago.estatus}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-white text-lg font-bold font-headline">
+                      Dr. {doc ? `${doc.nombre} ${doc.apellidos}` : "—"}
+                    </h4>
+                    {especialidad && (
+                      <p className="text-xs text-cyan-300 font-semibold uppercase tracking-widest">{especialidad}</p>
+                    )}
+                    <div className="flex items-center gap-1 text-white/50 text-xs mt-0.5">
+                      <span className="material-symbols-outlined text-xs">location_on</span>
+                      {con?.nombre || "—"}{con?.sucursales?.nombre && ` · ${con.sucursales.nombre}`}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[var(--color-tertiary-fixed)] text-sm font-semibold tracking-wide uppercase">{appt.especialidad}</span>
-                    <div className="w-2 h-2 rounded-full bg-[var(--color-tertiary-fixed)] shadow-[0_0_8px_#81f4f6]"></div>
-                  </div>
-                  <h4 className="text-white text-xl font-bold font-headline mb-1">
-                    {(appt.doctor as any)?.nombre ?? "Doctor"}
-                  </h4>
-                  <div className="flex items-center gap-2 text-white/70">
-                    <span className="material-symbols-outlined text-sm">location_on</span>
-                    <span className="text-sm">{appt.sucursal}</span>
-                  </div>
+
+                {/* Acciones */}
+                <div className="flex items-center gap-3">
+                  {(cita.estado === "pendiente" || cita.estado === "confirmada") && (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelar(cita.id)}
+                      className="px-5 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold hover:bg-red-500/20 transition-all active:scale-95"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  {cita.estado === "completada" && (
+                    <Link
+                      href="/dashboard/paciente/expediente"
+                      className="px-5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-bold hover:bg-emerald-500/20 transition-all"
+                    >
+                      Ver Expediente
+                    </Link>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => handleCancel(appt.id)}
-                  className="px-6 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold uppercase tracking-widest hover:bg-red-500/20 transition-all active:scale-95"
-                >
-                  Cancelar
-                </button>
-                <Link href={`/dashboard/paciente/citas/${appt.id}`} className="px-6 py-2 rounded-xl bg-white/5 border border-white/20 text-white text-sm font-bold uppercase tracking-widest hover:bg-[var(--color-primary-container)] hover:border-transparent transition-all active:scale-95 block text-center">
-                  Detalles
-                </Link>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }

@@ -1,13 +1,122 @@
 "use client";
 
-"use client";
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-
-const barHeights = ["h-3/5", "h-2/5", "h-4/5", "h-3/5", "h-full", "h-4/5", "h-2/5"];
+import { createClient } from "@/utils/supabase/client";
 
 export default function AdminDashboard() {
+  const supabase = createClient();
+  const [stats, setStats] = useState({
+    doctores: 0,
+    asistentes: 0,
+    admins: 0,
+    sucursales: 0,
+    consultorios: 0,
+    asignaciones: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        // Ejecutar consultas en paralelo para máxima velocidad y eficiencia
+        const [
+          { count: docCount },
+          { count: asisCount },
+          { count: adminCount },
+          { count: sucCount },
+          { count: conCount },
+          { count: asigCount },
+        ] = await Promise.all([
+          supabase.from("usuarios").select("*", { count: "exact", head: true }).eq("rol", "doctor"),
+          supabase.from("usuarios").select("*", { count: "exact", head: true }).eq("rol", "secretaria"),
+          supabase.from("usuarios").select("*", { count: "exact", head: true }).eq("rol", "admin"),
+          supabase.from("sucursales").select("*", { count: "exact", head: true }),
+          supabase.from("consultorios").select("*", { count: "exact", head: true }),
+          supabase.from("doctor_consultorios").select("*", { count: "exact", head: true }),
+        ]);
+
+        setStats({
+          doctores: docCount || 0,
+          asistentes: asisCount || 0,
+          admins: adminCount || 0,
+          sucursales: sucCount || 0,
+          consultorios: conCount || 0,
+          asignaciones: asigCount || 0,
+        });
+      } catch (err) {
+        console.error("Error al cargar estadísticas en tiempo real:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadStats();
+  }, []);
+
+  const bentoItems = [
+    {
+      title: "Alta de Doctores",
+      desc: "Registra profesionales médicos, especialidades y precios de consulta.",
+      icon: "medical_services",
+      href: "/dashboard/admin/doctores",
+      count: stats.doctores,
+      countLabel: "Médicos activos",
+      color: "from-cyan-500/20 to-teal-500/10 border-cyan-500/30 text-cyan-300",
+      iconColor: "text-cyan-400",
+    },
+    {
+      title: "Alta de Recepcionistas",
+      desc: "Gestiona asistentes y personal de recepción asignados a clínicas.",
+      icon: "support_agent",
+      href: "/dashboard/admin/asistentes",
+      count: stats.asistentes,
+      countLabel: "Asistentes activos",
+      color: "from-blue-500/20 to-indigo-500/10 border-blue-500/30 text-blue-300",
+      iconColor: "text-blue-400",
+    },
+    {
+      title: "Alta de Administradores",
+      desc: "Incorpora personal administrativo para control de sedes y finanzas.",
+      icon: "admin_panel_settings",
+      href: "/dashboard/admin/administradores",
+      count: stats.admins,
+      countLabel: "Administradores",
+      color: "from-purple-500/20 to-fuchsia-500/10 border-purple-500/30 text-purple-300",
+      iconColor: "text-purple-400",
+    },
+    {
+      title: "Alta de Consultorios",
+      desc: "Administra espacios físicos y consultorios dentro de cada sede.",
+      icon: "meeting_room",
+      href: "/dashboard/admin/consultorios",
+      count: stats.consultorios,
+      countLabel: "Consultorios",
+      color: "from-amber-500/20 to-orange-500/10 border-amber-500/30 text-amber-300",
+      iconColor: "text-amber-400",
+    },
+    {
+      title: "Alta de Sucursales",
+      desc: "Añade y edita sedes físicas y clínicas de la red NexusSalud.",
+      icon: "domain",
+      href: "/dashboard/admin/sucursales",
+      count: stats.sucursales,
+      countLabel: "Sucursales/Sedes",
+      color: "from-emerald-500/20 to-teal-500/10 border-emerald-500/30 text-emerald-300",
+      iconColor: "text-emerald-400",
+    },
+    {
+      title: "Asignación de Horarios",
+      desc: "Agenda la disponibilidad semanal de médicos en consultorios.",
+      icon: "calendar_month",
+      href: "/dashboard/admin/asignaciones",
+      count: stats.asignaciones,
+      countLabel: "Turnos asignados",
+      color: "from-rose-500/20 to-pink-500/10 border-rose-500/30 text-rose-300",
+      iconColor: "text-rose-400",
+    },
+  ];
+
   return (
     <>
       {/* TopAppBar */}
@@ -21,7 +130,7 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-6">
           <Link
             href="/"
-            className="text-xs font-bold uppercase tracking-wider text-red-300 border border-red-300/40 px-3 py-2 rounded-full hover:bg-red-500/20 transition-colors"
+            className="text-xs font-bold uppercase tracking-wider text-red-300 border border-red-300/40 px-4 py-2 rounded-full hover:bg-red-500/20 transition-colors"
           >
             Salir
           </Link>
@@ -37,74 +146,57 @@ export default function AdminDashboard() {
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 pt-10 pb-32">
         {/* Welcome */}
-        <section className="mb-12">
-          <h1 className="text-5xl font-extrabold text-white font-headline tracking-tight mb-2">Hola, Administrador</h1>
-          <p className="text-slate-400 text-lg">Panel de gestión central</p>
+        <section className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-5xl font-extrabold text-white font-headline tracking-tight mb-2">Panel Administrativo</h1>
+            <p className="text-slate-400 text-lg">Control total de personal, sedes, consultorios y horarios de atención</p>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/30 w-fit">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span className="text-xs font-bold text-cyan-300 uppercase tracking-widest">Base de Datos Conectada</span>
+          </div>
         </section>
 
-        {/* Bento Grid Stats */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Hero: Total Citas */}
-          <div className="lg:col-span-2 rounded-[2rem] p-8 flex flex-col justify-between min-h-[320px] shadow-2xl overflow-hidden relative group" style={{ background: "rgba(0,163,173,0.1)", backdropFilter: "blur(24px)", borderTop: "1px solid rgba(255,255,255,0.2)", borderLeft: "1px solid rgba(255,255,255,0.2)" }}>
-            <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:opacity-40 transition-opacity">
-              <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: "96px" }}>calendar_month</span>
-            </div>
-            <div>
-              <span className="text-cyan-300 font-semibold tracking-widest uppercase text-xs mb-2 block">Resumen de Actividad</span>
-              <h2 className="text-white text-2xl font-bold mb-6">Total de Citas</h2>
-              <div className="flex items-center gap-2 mb-8">
-                <span className="text-4xl font-bold text-white font-headline">50</span>
-                <span className="text-cyan-300/60 text-sm font-medium uppercase tracking-wider">Citas Totales</span>
-              </div>
-            </div>
-            {/* Mini bar chart */}
-            <div className="flex items-end gap-2 h-20">
-              {barHeights.map((h, i) => (
-                <div key={i} className={`w-full bg-cyan-400/20 rounded-t-lg ${h} transition-all hover:bg-cyan-400/40`}></div>
-              ))}
-            </div>
-          </div>
-
-          {/* Side Stats Stack */}
-          <div className="flex flex-col gap-6">
-            {[
-              { label: "Citas por App", value: "40", icon: "smartphone", color: "bg-[#006970]/20 text-[#7df4ff]" },
-              { label: "Citas por Secretaría", value: "10", icon: "support_agent", color: "bg-[#3a5f94]/20 text-[#a7c8ff]" },
-              { label: "Citas Canceladas", value: "4", icon: "event_busy", color: "bg-red-900/20 text-red-400" },
-            ].map((stat, i) => (
-              <div key={i} className="rounded-[1.5rem] p-6 flex items-center justify-between group hover:bg-white/5 transition-all" style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <div>
-                  <p className="text-slate-400 text-sm font-medium mb-1">{stat.label}</p>
-                  <h3 className="text-2xl font-bold text-white">{stat.value}</h3>
+        {/* Bento Grid Command Center */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {bentoItems.map((item, i) => (
+            <Link
+              key={i}
+              href={item.href}
+              className={`group relative overflow-hidden rounded-[2rem] p-8 flex flex-col justify-between min-h-[260px] shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-cyan-950/20 border bg-gradient-to-br ${item.color}`}
+              style={{ backdropFilter: "blur(24px)" }}
+            >
+              {/* Background glowing circle on hover */}
+              <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-white/5 blur-2xl group-hover:bg-white/10 transition-colors duration-500"></div>
+              
+              <div>
+                <div className="flex justify-between items-start mb-6">
+                  <div className={`w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform duration-300 ${item.iconColor}`}>
+                    <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>{item.icon}</span>
+                  </div>
+                  <button className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 bg-white/5 border border-white/10 group-hover:bg-white/20 group-hover:text-white transition-all duration-300">
+                    <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                  </button>
                 </div>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform`}>
-                  <span className="material-symbols-outlined">{stat.icon}</span>
-                </div>
+                
+                <h3 className="text-2xl font-bold text-white font-headline mb-2 tracking-tight group-hover:text-white transition-colors">
+                  {item.title}
+                </h3>
+                <p className="text-slate-300/80 text-sm leading-relaxed font-light mb-6">
+                  {item.desc}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Gestión de Consultorios Banner */}
-        <div className="grid grid-cols-1 gap-8 mb-12">
-          <Link href="/dashboard/admin/consultorios" className="relative group h-64 overflow-hidden rounded-[2.5rem] block">
-            <img
-              alt="Consultorio médico moderno"
-              className="absolute inset-0 w-full h-full object-cover brightness-50 group-hover:scale-110 transition-transform duration-700"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUolgOFXNCNugD5xmCTjXkEGs2zWxdWa4EjD9NElm1tCBCz5KXbfu8VsVbKt9w3xxTkRhJ6zqP1A8LFWEhb8Uv4sis4SWv48OzxPrJEULojauGHIUTmAvThO4oAhJVYnTFZePMMB3aJia3xK_4w7Na1DNkQGEHNIGUFtYXyLfvGuKix4kDC7n1YQXWTiqj7w2MELttfG2cn_qM-d9gQzmwUt8-5XQ300Lae06rcdUlPHwufchV3Dqh0pJOAtRfQWEqDC7oDMZTavw"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#002022] via-transparent to-transparent"></div>
-            <div className="absolute bottom-0 left-0 p-10">
-              <div className="w-14 h-14 rounded-2xl bg-[#006970]/30 backdrop-blur-md flex items-center justify-center text-white mb-4">
-                <span className="material-symbols-outlined text-3xl">meeting_room</span>
+              <div className="flex items-center gap-3 border-t border-white/5 pt-4">
+                {loading ? (
+                  <div className="w-16 h-6 bg-white/5 animate-pulse rounded-lg"></div>
+                ) : (
+                  <span className="text-3xl font-black text-white font-headline">{item.count}</span>
+                )}
+                <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">{item.countLabel}</span>
               </div>
-              <h3 className="text-3xl font-bold text-white font-headline mb-2">Gestión de Consultorios</h3>
-              <p className="text-slate-300">Control de disponibilidad y asignación de espacios físicos.</p>
-            </div>
-            <button className="absolute top-8 right-8 w-12 h-12 rounded-full flex items-center justify-center text-white hover:bg-[#006970] transition-colors" style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <span className="material-symbols-outlined">arrow_forward</span>
-            </button>
-          </Link>
+            </Link>
+          ))}
         </div>
       </main>
     </>

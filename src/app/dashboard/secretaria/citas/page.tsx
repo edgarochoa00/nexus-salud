@@ -3,35 +3,73 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
-import type { Cita } from "@/types/supabase";
 
 export default function SecretariaCitas() {
   const supabase = createClient();
-  const [citas, setCitas] = useState<Cita[]>([]);
+  const [citas, setCitas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtroFecha, setFiltroFecha] = useState<"hoy" | "semana" | "todas">("hoy");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const fetchCitas = useCallback(async () => {
     setLoading(true);
     const hoy = new Date().toISOString().split("T")[0];
+    const finSemana = new Date();
+    finSemana.setDate(finSemana.getDate() + 7);
+    const finSemanaStr = finSemana.toISOString().split("T")[0];
 
-    const { data } = await supabase
+    let query = supabase
       .from("citas")
-      .select("*, paciente:perfiles!paciente_id(nombre), doctor:perfiles!doctor_id(nombre)")
-      .eq("fecha", hoy)
-      .in("estado", ["pendiente", "confirmada"])
+      .select(`
+        id, fecha, hora, estado, creada_por,
+        paciente:usuarios!paciente_id(nombre, apellidos, telefono),
+        doctor:usuarios!doctor_id(nombre, apellidos),
+        consultorio:consultorios(nombre, sucursales(nombre)),
+        pagos(folio, monto_total, estatus, metodo_pago)
+      `)
+      .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
 
-    setCitas((data as Cita[]) ?? []);
+    if (filtroFecha === "hoy") {
+      query = query.eq("fecha", hoy).in("estado", ["pendiente", "confirmada"]);
+    } else if (filtroFecha === "semana") {
+      query = query.gte("fecha", hoy).lte("fecha", finSemanaStr).in("estado", ["pendiente", "confirmada"]);
+    }
+
+    const { data, error } = await query;
+    if (!error) setCitas(data || []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, filtroFecha]);
 
   useEffect(() => { fetchCitas(); }, [fetchCitas]);
 
-  const handleCancelar = async (id: string) => {
-    if (!window.confirm("¿Cancelar esta cita?")) return;
-    await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
-    fetchCitas();
+  const handleConfirmar = async (id: number) => {
+    setErrorMsg(""); setSuccessMsg("");
+    const { error } = await supabase.from("citas").update({ estado: "confirmada" }).eq("id", id);
+    if (error) setErrorMsg(error.message);
+    else { setSuccessMsg("✓ Cita confirmada."); fetchCitas(); }
   };
+
+  const handleCancelar = async (id: number, pacienteNombre: string) => {
+    if (!window.confirm(`¿Cancelar la cita de ${pacienteNombre}?`)) return;
+    setErrorMsg(""); setSuccessMsg("");
+    const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
+    if (error) setErrorMsg(error.message);
+    else { setSuccessMsg("✓ Cita cancelada. El paciente recibirá una notificación automática."); fetchCitas(); }
+  };
+
+  const estadoBadge = (estado: string) => {
+    const map: Record<string, string> = {
+      pendiente: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+      confirmada: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30",
+      completada: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+      cancelada: "bg-red-500/10 text-red-300 border-red-500/30",
+    };
+    return map[estado] || "bg-white/5 text-white/40 border-white/10";
+  };
+
+  const hoy = new Date().toISOString().split("T")[0];
 
   return (
     <>
@@ -42,77 +80,156 @@ export default function SecretariaCitas() {
           </Link>
           <div>
             <h1 className="font-headline font-bold text-xl text-white tracking-tight">Control de Citas</h1>
+            <p className="text-xs text-white/40">{citas.length} cita{citas.length !== 1 ? "s" : ""} encontrada{citas.length !== 1 ? "s" : ""}</p>
           </div>
         </div>
-        <Link href="/dashboard/secretaria/agendar"
-          className="flex items-center gap-2 bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold px-4 py-2 rounded-full hover:bg-cyan-500/30 transition-colors">
+        <Link
+          href="/dashboard/secretaria/agendar"
+          className="flex items-center gap-2 bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold px-4 py-2 rounded-full hover:bg-cyan-500/30 transition-colors"
+        >
           <span className="material-symbols-outlined text-sm">add</span>
           Nueva Cita
         </Link>
       </header>
 
-      <main className="pt-safe-24 pb-32 px-6 max-w-5xl mx-auto space-y-6 relative z-10 w-full">
+      <main className="pb-32 px-6 max-w-5xl mx-auto space-y-4 relative z-10 w-full" style={{ paddingTop: "calc(env(safe-area-inset-top) + 5rem)" }}>
+        
+        {/* Mensajes */}
+        {successMsg && (
+          <div className="bg-green-500/20 border border-green-500/40 text-green-300 text-sm font-semibold px-4 py-3 rounded-2xl">
+            {successMsg}
+          </div>
+        )}
+        {errorMsg && (
+          <div className="bg-red-500/20 border border-red-500/40 text-red-300 text-sm font-semibold px-4 py-3 rounded-2xl">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Filtros de fecha */}
+        <div className="flex gap-2">
+          {(["hoy", "semana", "todas"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFiltroFecha(f)}
+              className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${
+                filtroFecha === f
+                  ? "bg-cyan-500 text-white shadow-[0_4px_15px_rgba(6,182,212,0.4)]"
+                  : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+              }`}
+            >
+              {f === "hoy" ? "Hoy" : f === "semana" ? "Esta Semana" : "Todas"}
+            </button>
+          ))}
+        </div>
+
+        {/* Lista */}
         {loading ? (
-          <div className="text-center py-20">
-            <span className="material-symbols-outlined text-5xl text-white/20 animate-spin">progress_activity</span>
+          <div className="space-y-4">
+            {[1, 2, 3].map((n) => <div key={n} className="h-28 bg-white/5 animate-pulse rounded-[1.5rem] border border-white/10" />)}
           </div>
         ) : citas.length === 0 ? (
           <div className="text-center py-16 bg-white/5 rounded-[2rem] border border-white/10">
             <span className="material-symbols-outlined text-5xl text-white/20">event_busy</span>
-            <p className="text-white/50 mt-2 text-sm">No hay citas programadas para hoy.</p>
-            <Link href="/dashboard/secretaria/agendar"
-              className="inline-block mt-4 px-6 py-2 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-bold">
+            <p className="text-white/50 mt-2 text-sm">No hay citas en este período.</p>
+            <Link
+              href="/dashboard/secretaria/agendar"
+              className="inline-block mt-4 px-6 py-2 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-bold"
+            >
               Agendar cita
             </Link>
           </div>
         ) : (
-          <section className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <h2 className="font-headline font-bold text-lg text-white/90">Agenda del Día — {citas.length} cita{citas.length !== 1 ? "s" : ""}</h2>
-            </div>
-            <div className="space-y-4">
-              {citas.map((cita, idx) => (
-                <div key={cita.id}
-                  className={`bg-[#083344]/40 backdrop-blur-3xl border border-white/15 p-5 rounded-[1.5rem] flex items-center justify-between shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] border-l-4 ${idx === 0 ? 'border-l-cyan-400' : 'border-l-transparent'}`}>
-                  <div className="flex gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex flex-col items-center justify-center border border-white/10 shrink-0">
-                      <span className={`${idx === 0 ? 'text-cyan-400' : 'text-white/80'} font-headline font-extrabold text-sm`}>
+          <div className="space-y-4">
+            {citas.map((cita: any) => {
+              const pac = cita.paciente;
+              const doc = cita.doctor;
+              const con = cita.consultorio;
+              const pago = cita.pagos?.[0];
+              const isToday = cita.fecha === hoy;
+
+              return (
+                <div
+                  key={cita.id}
+                  className={`bg-white/5 backdrop-blur-xl border rounded-[1.5rem] p-5 transition-all hover:bg-white/8 ${
+                    isToday ? "border-cyan-500/30" : "border-white/10"
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Hora/Fecha */}
+                    <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center text-center shrink-0 border ${
+                      isToday ? "bg-cyan-500/10 border-cyan-500/30" : "bg-white/5 border-white/10"
+                    }`}>
+                      <span className={`text-[10px] font-bold uppercase ${isToday ? "text-cyan-300" : "text-white/40"}`}>
+                        {new Date(cita.fecha + "T00:00").toLocaleDateString("es-MX", { month: "short" })}
+                      </span>
+                      <span className={`text-xl font-black leading-none ${isToday ? "text-cyan-300" : "text-white/80"}`}>
+                        {new Date(cita.fecha + "T00:00").getDate()}
+                      </span>
+                      <span className="text-[9px] text-white/40 font-bold">
                         {cita.hora?.slice(0, 5)}
                       </span>
                     </div>
-                    <div>
-                      <h4 className="font-headline font-bold text-white text-md">{(cita.paciente as any)?.nombre ?? "Paciente"}</h4>
-                      <p className="text-xs text-white/50 mt-0.5">Dr. {(cita.doctor as any)?.nombre ?? "—"}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-semibold border border-cyan-500/20">
-                          {cita.especialidad}
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${estadoBadge(cita.estado)}`}>
+                          {cita.estado}
                         </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 font-semibold border border-white/10">
-                          {cita.sucursal}
-                        </span>
+                        {pago && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                            pago.estatus === "pagado" 
+                              ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                              : "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                          }`}>
+                            ${pago.monto_total} MXN · {pago.estatus}
+                          </span>
+                        )}
                       </div>
+
+                      <h3 className="font-bold text-white font-headline">
+                        {pac ? `${pac.nombre} ${pac.apellidos}` : "Paciente"}
+                      </h3>
+                      <p className="text-xs text-white/50 mt-0.5">
+                        Dr. {doc ? `${doc.nombre} ${doc.apellidos}` : "—"} · {con?.nombre || "—"}
+                        {con?.sucursales?.nombre && ` · ${con.sucursales.nombre}`}
+                      </p>
+                      {pac?.telefono && (
+                        <p className="text-xs text-white/40 mt-1 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-xs">call</span>
+                          {pac.telefono}
+                        </p>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleCancelar(cita.id)}
-                      className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all active:scale-95"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => window.alert(`Paciente: ${(cita.paciente as any)?.nombre}\nEspecialidad: ${cita.especialidad}\nHora: ${cita.hora?.slice(0, 5)}\nSucursal: ${cita.sucursal}`)}
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white/30 hover:text-cyan-400 transition-colors hover:bg-cyan-500/10"
-                    >
-                      <span className="material-symbols-outlined">more_vert</span>
-                    </button>
+
+                    {/* Acciones */}
+                    {(cita.estado === "pendiente" || cita.estado === "confirmada") && (
+                      <div className="flex flex-col gap-2 shrink-0">
+                        {cita.estado === "pendiente" && (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmar(cita.id)}
+                            className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition-all active:scale-95 whitespace-nowrap"
+                          >
+                            Confirmar
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleCancelar(cita.id, pac ? `${pac.nombre} ${pac.apellidos}` : "este paciente")}
+                          className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all active:scale-95"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
+              );
+            })}
+          </div>
         )}
       </main>
     </>
