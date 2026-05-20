@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return NextResponse.json({ error: "Error al buscar usuario" }, { status: 500 });
+    console.error("Error al buscar usuario en Supabase:", error);
+    return NextResponse.json({ error: "Error interno del servidor (posible falta de SERVICE_ROLE_KEY)" }, { status: 500 });
   }
 
   const usernameLower = username.toLowerCase().trim();

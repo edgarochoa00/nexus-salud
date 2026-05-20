@@ -43,7 +43,11 @@ export default function UniversalLogin() {
       });
 
       if (authError || !data.user) {
-        setError("Contraseña incorrecta. Inténtalo de nuevo.");
+        if (authError?.message.includes("Email not confirmed")) {
+          setError("Debes confirmar tu correo electrónico. Revisa tu bandeja de entrada.");
+        } else {
+          setError("Contraseña incorrecta o ID no válido. Inténtalo de nuevo.");
+        }
         return;
       }
 

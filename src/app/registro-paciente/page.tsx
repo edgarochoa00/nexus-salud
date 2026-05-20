@@ -34,20 +34,21 @@ export default function RegistroPaciente() {
       return;
     }
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: formData.correo,
-      password: formData.password,
-      options: {
-        data: {
-          nombre: formData.nombre,
-          username: formData.username.toLowerCase(),
-          rol: "paciente",
-        },
-      },
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: formData.nombre,
+        username: formData.username,
+        email: formData.correo,
+        password: formData.password,
+      }),
     });
 
-    if (signUpError) {
-      setError(signUpError.message);
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Error al crear la cuenta.");
       setLoading(false);
       return;
     }
