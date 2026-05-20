@@ -53,7 +53,7 @@ export default function UniversalLogin() {
 
       // 3. Obtener rol y redirigir
       const { data: perfil } = await supabase
-        .from("perfiles")
+        .from("usuarios")
         .select("rol")
         .eq("id", data.user.id)
         .single();

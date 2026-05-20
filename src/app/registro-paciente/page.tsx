@@ -17,6 +17,7 @@ export default function RegistroPaciente() {
     username: "",
     correo: "",
     password: "",
+    fecha_nacimiento: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,12 @@ export default function RegistroPaciente() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    if (!formData.fecha_nacimiento) {
+      setError("Por favor selecciona tu fecha de nacimiento.");
+      setLoading(false);
+      return;
+    }
 
     // Validar que el username no tenga espacios o caracteres especiales
     const usernameValido = /^[a-zA-Z0-9._-]{3,20}$/.test(formData.username);
@@ -42,6 +49,7 @@ export default function RegistroPaciente() {
         username: formData.username,
         email: formData.correo,
         password: formData.password,
+        fecha_nacimiento: formData.fecha_nacimiento,
       }),
     });
 
@@ -87,6 +95,11 @@ export default function RegistroPaciente() {
               />
               <p className="text-[10px] text-white/40 mt-1 ml-1">Este será tu identificador para iniciar sesión. 3-20 caracteres.</p>
             </div>
+            <InputGlass
+              id="fecha_nacimiento" label="Fecha de Nacimiento"
+              type="date" icon="calendar_today" value={formData.fecha_nacimiento}
+              onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
+            />
             <InputGlass
               id="correo" label="Correo Electrónico" placeholder="correo@ejemplo.com"
               type="email" icon="mail" value={formData.correo}
