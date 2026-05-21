@@ -24,7 +24,7 @@ export default function MisCitasList() {
         .from("citas")
         .select(`
           id, fecha, hora, estado,
-          doctor:usuarios!doctor_id(nombre, apellidos, doctores(especialidades(nombre))),
+          doctor:doctores!doctor_id(usuarios(nombre, apellidos), especialidades(nombre)),
           consultorio:consultorios(nombre, sucursales(nombre)),
           pagos(folio, monto_total, estatus)
         `)
@@ -167,7 +167,7 @@ export default function MisCitasList() {
             const doc = cita.doctor;
             const con = cita.consultorio;
             const pago = cita.pagos?.[0];
-            const espInfo = doc?.doctores?.[0]?.especialidades || doc?.doctores?.especialidades;
+            const espInfo = doc?.especialidades;
             const especialidad = espInfo?.nombre;
             const badge = estadoBadge(cita.estado);
 
@@ -201,7 +201,7 @@ export default function MisCitasList() {
                       )}
                     </div>
                     <h4 className="text-white text-lg font-bold font-headline">
-                      Dr. {doc ? `${doc.nombre} ${doc.apellidos}` : "—"}
+                      Dr. {doc?.usuarios ? `${doc.usuarios.nombre} ${doc.usuarios.apellidos}` : "—"}
                     </h4>
                     {especialidad && (
                       <p className="text-xs text-cyan-300 font-semibold uppercase tracking-widest">{especialidad}</p>

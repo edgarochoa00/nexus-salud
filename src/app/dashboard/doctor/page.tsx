@@ -30,7 +30,7 @@ export default function DoctorDashboard() {
           .from("citas")
           .select(`
             id, fecha, hora, estado,
-            paciente:usuarios!paciente_id(nombre, apellidos),
+            paciente:pacientes!paciente_id(usuarios(nombre, apellidos)),
             consultorio:consultorios(nombre)
           `)
           .eq("doctor_id", user.id)
@@ -52,7 +52,8 @@ export default function DoctorDashboard() {
       if (usuarioRes.data) {
         const u = usuarioRes.data as any;
         setDoctorName(`${u.nombre} ${u.apellidos}`);
-        setEspecialidad(u.doctores?.[0]?.especialidades?.nombre || u.doctores?.especialidades?.nombre || "");
+        const doc = Array.isArray(u.doctores) ? u.doctores[0] : u.doctores;
+        setEspecialidad(doc?.especialidades?.nombre || "");
       }
 
       setCitasHoy(citasHoyRes.data || []);
@@ -166,7 +167,7 @@ export default function DoctorDashboard() {
                       </div>
                       <div>
                         <h4 className="font-bold text-white">
-                          {pac ? `${pac.nombre} ${pac.apellidos}` : "Paciente"}
+                          {pac?.usuarios ? `${pac.usuarios.nombre} ${pac.usuarios.apellidos}` : "Paciente"}
                         </h4>
                         <p className="text-xs text-white/50 mt-0.5">
                           {con?.nombre || "Consultorio"} · <span className={`font-semibold ${estadoColor(cita.estado).split(" ")[0]}`}>{cita.estado}</span>

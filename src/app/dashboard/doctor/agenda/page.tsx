@@ -19,7 +19,7 @@ export default function DoctorAgenda() {
       .from("citas")
       .select(`
         id, fecha, hora, estado,
-        paciente:usuarios!paciente_id(nombre, apellidos, telefono),
+        paciente:pacientes!paciente_id(usuarios(nombre, apellidos, telefono)),
         consultorio:consultorios(nombre, sucursales(nombre))
       `)
       .eq("doctor_id", user.id)
@@ -159,15 +159,15 @@ export default function DoctorAgenda() {
                         )}
                       </div>
                       <h3 className="font-bold text-white font-headline truncate">
-                        {pac ? `${pac.nombre} ${pac.apellidos}` : "Paciente"}
+                        {pac?.usuarios ? `${pac.usuarios.nombre} ${pac.usuarios.apellidos}` : "Paciente"}
                       </h3>
                       <p className="text-xs text-white/50 mt-0.5">
                         {con?.nombre || "—"}{sucursal ? ` · ${sucursal}` : ""}
                       </p>
-                      {pac?.telefono && (
+                      {pac?.usuarios?.telefono && (
                         <p className="text-xs text-white/40 mt-0.5 flex items-center gap-1">
                           <span className="material-symbols-outlined text-xs">call</span>
-                          {pac.telefono}
+                          {pac.usuarios.telefono}
                         </p>
                       )}
                     </div>

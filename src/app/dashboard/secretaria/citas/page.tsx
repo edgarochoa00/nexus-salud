@@ -23,8 +23,8 @@ export default function SecretariaCitas() {
       .from("citas")
       .select(`
         id, fecha, hora, estado, creada_por,
-        paciente:usuarios!paciente_id(nombre, apellidos, telefono),
-        doctor:usuarios!doctor_id(nombre, apellidos),
+        paciente:pacientes!paciente_id(usuarios(nombre, apellidos, telefono)),
+        doctor:doctores!doctor_id(usuarios(nombre, apellidos)),
         consultorio:consultorios(nombre, sucursales(nombre)),
         pagos(folio, monto_total, estatus, metodo_pago)
       `)
@@ -190,16 +190,16 @@ export default function SecretariaCitas() {
                       </div>
 
                       <h3 className="font-bold text-white font-headline">
-                        {pac ? `${pac.nombre} ${pac.apellidos}` : "Paciente"}
+                        {pac?.usuarios ? `${pac.usuarios.nombre} ${pac.usuarios.apellidos}` : "Paciente"}
                       </h3>
                       <p className="text-xs text-white/50 mt-0.5">
-                        Dr. {doc ? `${doc.nombre} ${doc.apellidos}` : "—"} · {con?.nombre || "—"}
+                        Dr. {doc?.usuarios ? `${doc.usuarios.nombre} ${doc.usuarios.apellidos}` : "—"} · {con?.nombre || "—"}
                         {con?.sucursales?.nombre && ` · ${con.sucursales.nombre}`}
                       </p>
-                      {pac?.telefono && (
+                      {pac?.usuarios?.telefono && (
                         <p className="text-xs text-white/40 mt-1 flex items-center gap-1">
                           <span className="material-symbols-outlined text-xs">call</span>
-                          {pac.telefono}
+                          {pac.usuarios.telefono}
                         </p>
                       )}
                     </div>
@@ -218,7 +218,7 @@ export default function SecretariaCitas() {
                         )}
                         <button
                           type="button"
-                          onClick={() => handleCancelar(cita.id, pac ? `${pac.nombre} ${pac.apellidos}` : "este paciente")}
+                          onClick={() => handleCancelar(cita.id, pac?.usuarios ? `${pac.usuarios.nombre} ${pac.usuarios.apellidos}` : "este paciente")}
                           className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all active:scale-95"
                         >
                           Cancelar

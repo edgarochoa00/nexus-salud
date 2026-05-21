@@ -26,7 +26,7 @@ export default function DoctorConsultas() {
       .from("citas")
       .select(`
         id, fecha, hora, estado,
-        paciente:usuarios!paciente_id(id, nombre, apellidos),
+        paciente:pacientes!paciente_id(id, usuarios(id, nombre, apellidos)),
         consultorio:consultorios(nombre),
         consultas(id, motivo, receta, fecha_hora)
       `)
@@ -151,7 +151,7 @@ export default function DoctorConsultas() {
                     <option value="" disabled>Seleccionar cita...</option>
                     {citasCompletadas.map((c: any) => (
                       <option key={c.id} value={c.id} className="bg-cyan-950 text-white">
-                        {c.fecha} {c.hora?.slice(0, 5)} — {c.paciente ? `${c.paciente.nombre} ${c.paciente.apellidos}` : "Paciente"}
+                        {c.fecha} {c.hora?.slice(0, 5)} — {c.paciente?.usuarios ? `${c.paciente.usuarios.nombre} ${c.paciente.usuarios.apellidos}` : "Paciente"}
                         {c.consultas?.length > 0 ? " ✓" : ""}
                       </option>
                     ))}
@@ -244,7 +244,7 @@ export default function DoctorConsultas() {
                           </div>
                           <div>
                             <h4 className="font-bold text-white text-sm font-headline">
-                              {cita.paciente ? `${cita.paciente.nombre} ${cita.paciente.apellidos}` : "Paciente"}
+                              {cita.paciente?.usuarios ? `${cita.paciente.usuarios.nombre} ${cita.paciente.usuarios.apellidos}` : "Paciente"}
                             </h4>
                             <p className="text-xs text-white/40">{cita.fecha} · {cita.consultorio?.nombre || "—"}</p>
                           </div>

@@ -3,17 +3,17 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 
 export default function NuevoPacienteSecretaria() {
   const router = useRouter();
-  const supabase = createClient();
   const [formData, setFormData] = useState({
     nombre: "",
+    apellidos: "",
     username: "",
     correo: "",
     telefono: "",
     curp: "",
+    fecha_nacimiento: "",
     password: "",
   });
   const [error, setError] = useState("");
@@ -24,29 +24,35 @@ export default function NuevoPacienteSecretaria() {
     setError("");
     setLoading(true);
 
-    // Crear usuario en Supabase Auth con rol "paciente"
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: formData.correo,
-      password: formData.password,
-      options: {
-        data: {
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           nombre: formData.nombre,
+          apellidos: formData.apellidos,
           username: formData.username.toLowerCase(),
-          rol: "paciente",
+          email: formData.correo,
+          password: formData.password,
+          fecha_nacimiento: formData.fecha_nacimiento || "2000-01-01",
           telefono: formData.telefono,
           curp: formData.curp,
-        },
-      },
-    });
+        }),
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Ocurrió un error al registrar el paciente.");
+      }
+
+      alert("Paciente registrado correctamente. Ya puede iniciar sesión en la app.");
+      router.push("/dashboard/secretaria");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    alert("Paciente registrado correctamente. Ya puede iniciar sesión en la app.");
-    router.push("/dashboard/secretaria");
   };
 
   return (
@@ -75,14 +81,26 @@ export default function NuevoPacienteSecretaria() {
         )}
 
         <form className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-8 shadow-2xl flex flex-col gap-5" onSubmit={handleRegister}>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Nombre Completo</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">person</span>
-              <input required type="text" placeholder="Ej. Juan Pérez"
-                className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
-                value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Nombre(s)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">person</span>
+                <input required type="text" placeholder="Ej. Juan"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
+                  value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Apellidos</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">person</span>
+                <input required type="text" placeholder="Ej. Pérez"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
+                  value={formData.apellidos} onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                />
+              </div>
             </div>
           </div>
 
@@ -132,12 +150,13 @@ export default function NuevoPacienteSecretaria() {
               </div>
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">CURP / ID</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Fecha de Nacimiento</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">badge</span>
-                <input type="text" placeholder="ABCD123456EFGHIJ78"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium uppercase"
-                  value={formData.curp} onChange={(e) => setFormData({ ...formData, curp: e.target.value })}
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">calendar_today</span>
+                <input required type="date"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
+                  value={formData.fecha_nacimiento} onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
+                  style={{ colorScheme: 'dark' }}
                 />
               </div>
             </div>

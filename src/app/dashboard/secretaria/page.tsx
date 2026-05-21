@@ -1,134 +1,183 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import LogoutButton from "@/components/ui/LogoutButton";
+import { createClient } from "@/utils/supabase/client";
 
 export default function SecretariaDashboard() {
-  const sedes = [
-    {
-      id: 1,
-      name: "Clínica México",
-      subtitle: "Sede Principal",
-      imgSrc: "https://lh3.googleusercontent.com/aida-public/AB6AXuAjv5CqdVf1X-0TRetZkn2WzHk3PbQWyXBvoeWrpmMA4dC1hdCmUTp1UkWi33sdn3XrJ0yEZimSFrX-inEBxpW0ar212xi4R8A_KO7E241bwfY33txvQYSM_tC53rtDitxwj9jESePJ649sKHrRUX5Ua8s9xl6F8BZMH4Lk7dZmHbhnrlWMx7x08iWL3G_ISFu4FoyPrAvX9Fh4YNWT5s6fOq2DW6xD6bZNucLoVnuLW50sVORZHKCKBNOgx6cA9NbInOrjJQT3-OA",
-    },
-    {
-      id: 2,
-      name: "Sucursal Norte",
-      subtitle: "Centro de Diagnóstico",
-      imgSrc: "https://lh3.googleusercontent.com/aida-public/AB6AXuC86bEOlg61MB_8Dwc8HFsfW0D8g9BkPPrfERfkQZ54remUYM0qriMi1X6tCYr_Wzr_f76jYyHpZmfkb0k6jRBH8vqibPSc5CCUsWjQ3zmp0Knl5KVj7hwLyuAl08f6c6RMp8mf2XD_PrgMQh1dEy1gnzC7FpBMzItUS03xyoHl0OUI1n1TCyXBCT1nr_MbJtbGceRDorQmhHISEGLO00zpkF7KFdW7GihxLhbdcfwT_Ms_Bi8e_tMYctUm8zIF9tQTUeX7lbbxd6s",
-    }
-  ];
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [secretariaName, setSecretariaName] = useState("Secretaria");
+  const [citasHoy, setCitasHoy] = useState<any[]>([]);
+  const [sucursales, setSucursales] = useState<any[]>([]);
 
-  const citas = [
-    { id: 1, time: "10:30", period: "AM", patient: "Juan Pérez", spec: "Cardiología", active: true },
-    { id: 2, time: "11:15", period: "AM", patient: "María Rodríguez", spec: "Dermatología", active: false },
-    { id: 3, time: "12:00", period: "PM", patient: "Roberto Sánchez", spec: "Nutrición", active: false },
-  ];
+  const fetchData = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const hoy = new Date().toISOString().split("T")[0];
+
+    const [usuarioRes, citasRes, sucursalesRes] = await Promise.all([
+      supabase.from("usuarios").select("nombre, apellidos").eq("id", user.id).single(),
+      supabase.from("citas")
+        .select(`
+          id, fecha, hora, estado,
+          paciente:pacientes!paciente_id(usuarios(nombre, apellidos)),
+          doctor:doctores!doctor_id(usuarios(nombre, apellidos), especialidades(nombre)),
+          consultorio:consultorios(nombre)
+        `)
+        .eq("fecha", hoy)
+        .in("estado", ["pendiente", "confirmada"])
+        .order("hora", { ascending: true })
+        .limit(3),
+      supabase.from("sucursales").select("*").limit(5)
+    ]);
+
+    if (usuarioRes.data) {
+      setSecretariaName(usuarioRes.data.nombre);
+    }
+    if (citasRes.data) {
+      setCitasHoy(citasRes.data);
+    }
+    if (sucursalesRes.data) {
+      setSucursales(sucursalesRes.data);
+    }
+    
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const estadoBadge = (estado: string) => {
+    if (estado === "confirmada") return "text-cyan-300 bg-cyan-500/10 border-cyan-500/30";
+    if (estado === "pendiente") return "text-amber-300 bg-amber-500/10 border-amber-500/30";
+    return "text-slate-400 bg-white/5 border-white/10";
+  };
 
   return (
-    <>
-      {/* TopAppBar */}
-      <header className="safe-header fixed top-0 w-full z-40 flex justify-between items-center px-6 py-4 bg-cyan-950/40 backdrop-blur-xl border-b border-white/10 shadow-[0_32px_32px_-4px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center gap-3">
+    <main className="relative pt-safe-24 pb-32 px-6 max-w-lg mx-auto">
+      {/* Header */}
+      <section className="mb-8">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="font-headline font-bold text-xl text-white tracking-tight">Hola, Elena</h1>
-            <p className="text-[10px] text-cyan-400 font-semibold uppercase tracking-widest">Panel de Gestión Operativa</p>
+            <h1 className="text-white font-headline text-3xl font-extrabold tracking-tight mb-1">
+              {loading ? "Cargando..." : `Hola, ${secretariaName.split(" ")[0]}`}
+            </h1>
+            <p className="text-cyan-100/80 font-medium">Panel de Recepción</p>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <LogoutButton />
-          <button
-            type="button"
-            onClick={() => window.alert("No hay notificaciones nuevas.")}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+          <Link
+            href="/"
+            className="text-xs font-bold uppercase tracking-wider text-red-300 border border-red-300/40 px-3 py-2 rounded-full hover:bg-red-500/20 transition-colors"
           >
-            <span className="material-symbols-outlined text-cyan-400">notifications</span>
-          </button>
+            Salir
+          </Link>
         </div>
-      </header>
+      </section>
 
-      <main className="pt-safe-24 pb-32 px-6 max-w-5xl mx-auto space-y-10 relative z-10 w-full">
-        {/* Carrusel de Sedes */}
-        <section>
-          <div className="flex justify-between items-end mb-4">
-            <h2 className="font-headline font-bold text-lg text-white/90">Sedes Disponibles</h2>
-            <Link href="/dashboard/secretaria/citas" className="text-xs font-semibold text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">Ver todas</Link>
+      {/* Quick Action Buttons */}
+      <section className="mb-10 grid grid-cols-2 gap-4">
+        <Link href="/dashboard/secretaria/agendar" className="bg-white/10 backdrop-blur-2xl rounded-3xl p-5 border border-white/20 hover:bg-white/20 transition-all active:scale-95 flex flex-col items-center justify-center gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <div className="w-14 h-14 rounded-[1rem] bg-cyan-500/20 flex items-center justify-center text-cyan-300">
+            <span className="material-symbols-outlined text-3xl">event_upcoming</span>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-            {sedes.map((sede) => (
-              <div key={sede.id} className="bg-white/10 backdrop-blur-2xl border border-white/10 flex-none w-64 rounded-3xl overflow-hidden relative group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-                <img 
-                  alt={sede.name} 
-                  className="w-full h-40 object-cover opacity-70 group-hover:scale-110 transition-transform duration-700" 
-                  src={sede.imgSrc} 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-cyan-950 via-transparent to-transparent"></div>
-                <div className="absolute bottom-4 left-4">
-                  <h3 className="font-headline font-bold text-white">{sede.name}</h3>
-                  <p className="text-xs text-white/60">{sede.subtitle}</p>
-                </div>
-              </div>
-            ))}
+          <span className="text-white font-bold text-sm tracking-wide">Agendar Cita</span>
+        </Link>
+        
+        <Link href="/dashboard/secretaria/pacientes/nuevo" className="bg-white/10 backdrop-blur-2xl rounded-3xl p-5 border border-white/20 hover:bg-white/20 transition-all active:scale-95 flex flex-col items-center justify-center gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <div className="w-14 h-14 rounded-[1rem] bg-emerald-500/20 flex items-center justify-center text-emerald-300">
+            <span className="material-symbols-outlined text-3xl">person_add</span>
           </div>
-        </section>
+          <span className="text-white font-bold text-sm tracking-wide">Nuevo Paciente</span>
+        </Link>
+      </section>
 
-        {/* Botones de Acción Rápida */}
-        <section className="grid grid-cols-3 gap-4">
-          <Link href="/dashboard/secretaria/agendar" className="bg-[#083344]/40 backdrop-blur-3xl border border-white/15 flex flex-col items-center justify-center p-4 md:p-8 rounded-[2rem] aspect-square transition-all active:scale-95 group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center mb-2 md:mb-4 group-hover:bg-cyan-500/30 transition-colors">
-              <span className="material-symbols-outlined text-3xl md:text-4xl text-cyan-400">calendar_add_on</span>
-            </div>
-            <span className="font-headline font-bold text-white text-xs md:text-base text-center">Agendar Cita</span>
-          </Link>
-          <Link href="/dashboard/secretaria/citas" className="bg-[#083344]/40 backdrop-blur-3xl border border-white/15 flex flex-col items-center justify-center p-4 md:p-8 rounded-[2rem] aspect-square transition-all active:scale-95 group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center mb-2 md:mb-4 group-hover:bg-cyan-500/30 transition-colors">
-              <span className="material-symbols-outlined text-3xl md:text-4xl text-cyan-400">event_note</span>
-            </div>
-            <span className="font-headline font-bold text-white text-xs md:text-base text-center">Citas</span>
-          </Link>
-          <Link href="/dashboard/secretaria/pacientes/nuevo" className="bg-[#083344]/40 backdrop-blur-3xl border border-white/15 flex flex-col items-center justify-center p-4 md:p-8 rounded-[2rem] aspect-square transition-all active:scale-95 group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center mb-2 md:mb-4 group-hover:bg-cyan-500/30 transition-colors">
-              <span className="material-symbols-outlined text-3xl md:text-4xl text-cyan-400">person_add</span>
-            </div>
-            <span className="font-headline font-bold text-white text-xs md:text-base text-center">Nuevo Paciente</span>
-          </Link>
-        </section>
-
-        {/* Resumen de Citas Próximas */}
-        <section className="space-y-4">
-          <div className="flex justify-between items-center px-2">
-            <h2 className="font-headline font-bold text-lg text-white/90">Próximas Citas</h2>
-            <div className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full">
-              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-tighter">Hoy: {citas.length} Pendientes</span>
-            </div>
+      {/* Próximas Citas (Hoy) */}
+      <section className="mb-10">
+        <div className="flex justify-between items-end mb-4">
+          <div>
+            <h2 className="text-white/70 text-sm font-bold uppercase tracking-widest">Próximas Citas</h2>
+            <p className="text-white/40 text-xs mt-0.5">Para el día de hoy</p>
           </div>
-          
-          <div className="space-y-4">
-            {citas.map((cita) => (
-              <div 
-                key={cita.id} 
-                className={`bg-[#083344]/40 backdrop-blur-3xl border border-white/15 p-5 rounded-[1.5rem] flex items-center justify-between shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] border-l-4 ${cita.active ? 'border-l-cyan-400' : 'border-l-transparent'}`}
-              >
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex flex-col items-center justify-center border border-white/10 shrink-0">
-                    <span className={`${cita.active ? 'text-cyan-400' : 'text-white/80'} font-headline font-extrabold text-sm`}>{cita.time}</span>
-                    <span className="text-[8px] text-white/50 uppercase font-bold">{cita.period}</span>
+          <Link href="/dashboard/secretaria/citas" className="text-cyan-400 text-xs font-bold hover:text-cyan-300 transition-colors">Ver Todas</Link>
+        </div>
+
+        <div className="space-y-3">
+          {loading ? (
+            [1, 2, 3].map((n) => <div key={n} className="h-20 bg-white/5 animate-pulse rounded-2xl border border-white/10" />)
+          ) : citasHoy.length === 0 ? (
+            <div className="text-center py-8 bg-white/5 rounded-2xl border border-white/10">
+              <span className="material-symbols-outlined text-3xl text-white/20 mb-2">event_busy</span>
+              <p className="text-white/50 text-sm font-medium">No hay citas pendientes hoy</p>
+            </div>
+          ) : (
+            citasHoy.map((cita) => (
+              <div key={cita.id} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center justify-center shrink-0">
+                    <span className="text-white font-bold text-sm leading-none">{cita.hora?.slice(0, 5)}</span>
                   </div>
                   <div>
-                    <h4 className="font-headline font-bold text-white text-md">{cita.patient}</h4>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-semibold border border-cyan-500/20">
-                        {cita.spec}
-                      </span>
+                    <h4 className="text-white font-bold text-sm truncate max-w-[150px]">
+                      {cita.paciente?.usuarios ? `${cita.paciente.usuarios.nombre} ${cita.paciente.usuarios.apellidos}` : "Paciente"}
+                    </h4>
+                    <p className="text-white/50 text-xs mt-0.5 truncate max-w-[150px]">
+                      Dr. {cita.doctor?.usuarios ? cita.doctor.usuarios.nombre : "—"} · {cita.doctor?.especialidades?.nombre}
+                    </p>
+                  </div>
+                </div>
+                <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border shrink-0 ${estadoBadge(cita.estado)}`}>
+                  {cita.estado}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* Sedes Disponibles Carousel */}
+      <section className="mb-10">
+        <h2 className="text-white/70 text-sm font-bold uppercase tracking-widest mb-4">Sedes Disponibles</h2>
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-6 px-6">
+          {loading ? (
+            [1, 2].map(n => <div key={n} className="h-32 min-w-[240px] bg-white/5 animate-pulse rounded-2xl border border-white/10" />)
+          ) : sucursales.length === 0 ? (
+            <p className="text-white/50 text-sm">No hay sedes disponibles.</p>
+          ) : (
+            sucursales.map((sede, i) => {
+              const defaultImg = i % 2 === 0 
+               ? "https://lh3.googleusercontent.com/aida-public/AB6AXuAhwG0H4o0mJWLVQlRNAF7h279s-_k-46qiJgWUJC44ldFJr9XDIkalmZOEgu9cygw0u67LCcSDIqjyxxb6SsuPGLD1djjCMkS6BXd4I0KrU6M5bBYi0wlxDpitJ_xMeRa9oO2c69FIw0dyy20ZUFzObr0WRFth_gd759tDdefOX9AAEzVRfYIfc7TpoASsiMX8qVFAHfN2ub0D1bVo-Kqkb7HuHBH7eUEceA-9Fbb7RgYcBJiCRjorhINadRavxxNJPZuXXsjBlPE"
+               : "https://lh3.googleusercontent.com/aida-public/AB6AXuDXxrk-CAYl_oD4_o6Do9g_AzEOZ-URVtbtJWs7pqVKzu63Cgy9KX6G5dJGlrw68HOKi5OFAsDH8a5eboWm5aWsMiSA0aVZNMsUTOWyTpN0JHU_r88U5mbTIo3P-hndXiyXgrzb3bw7begh-1UuO1tboEaVUKVVFPVqCKRVKJb0RhUBVpT3IVjQ4kiUNAnZcKEAF0DoVXXHvkqQS08clNTDUrQtkJiZ_qv8WewDQJVnfCBvrLtekZ4lHo4IArURywo_WyHoPx6cqfE";
+              
+              return (
+                <div key={sede.id} className="bg-white/10 backdrop-blur-2xl min-w-[240px] rounded-2xl overflow-hidden shadow-lg border border-white/20 relative group">
+                  <div className="h-24 w-full relative">
+                    <img 
+                      alt={sede.nombre} 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                      src={defaultImg} 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                    <div className="absolute bottom-3 left-3">
+                      <span className="text-white font-headline font-bold text-sm block">{sede.nombre}</span>
+                    </div>
+                  </div>
+                  <div className="px-3 py-2 bg-white/5 flex justify-between items-center">
+                    <span className="text-white/50 text-[10px] uppercase font-bold truncate max-w-[120px]">{sede.direccion || "Sucursal"}</span>
+                    <div className="flex items-center text-cyan-300 text-[10px] font-bold">
+                      <span className="material-symbols-outlined text-[12px] mr-0.5">check_circle</span>
+                      Activa
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-    </>
+              );
+            })
+          )}
+        </div>
+      </section>
+    </main>
   );
 }

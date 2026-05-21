@@ -1,68 +1,110 @@
 "use client";
 
-import React from "react";
-export default function PerfilPaciente() {
-  const handleAbout = () => {
-    window.alert("NexusSalud conecta pacientes, doctores y sedes médicas en una sola plataforma.");
-  };
+import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { createClient } from "@/utils/supabase/client";
+
+export default function PacientePerfil() {
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [perfil, setPerfil] = useState<any>(null);
+
+  const fetchPerfil = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select(`
+        nombre, apellidos, correo, telefono, usuario,
+        pacientes(fecha_nacimiento)
+      `)
+      .eq("id", user.id)
+      .single();
+
+    if (!error && data) {
+      setPerfil({
+        ...data,
+        fecha_nacimiento: data.pacientes?.[0]?.fecha_nacimiento || data.pacientes?.fecha_nacimiento
+      });
+    }
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchPerfil();
+  }, [fetchPerfil]);
 
   return (
-    <main className="pt-safe-24 pb-32 px-6 max-w-2xl mx-auto space-y-8 relative z-10 w-full">
-      {/* Top Navigation - Adding specific title */}
-      <div className="mb-4">
-        <h1 className="font-headline font-bold text-3xl tracking-tight text-white">Mi Perfil</h1>
+    <main className="relative z-10 px-6 pb-32 max-w-2xl mx-auto w-full pt-6">
+      <div className="flex items-center gap-3 mb-8">
+        <Link href="/dashboard/paciente" className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </Link>
+        <h1 className="font-headline font-bold text-2xl text-white tracking-tight">Mi Perfil</h1>
       </div>
 
-      {/* User Section */}
-      <section className="flex flex-col items-center text-center">
-        <div className="space-y-1 mt-4">
-          <h2 className="font-headline font-extrabold text-3xl tracking-tight text-white">Juan Pérez</h2>
-          <p className="font-label text-sm font-semibold uppercase tracking-widest text-[var(--color-primary-container)]">ID: NS-99283</p>
-          <span className="inline-block px-4 py-1.5 mt-2 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 text-xs font-medium text-white/90 shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]">
-            Paciente Premium
-          </span>
+      {loading ? (
+        <div className="h-64 bg-white/5 animate-pulse rounded-[2rem] border border-white/10" />
+      ) : perfil ? (
+        <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-primary)]/20 rounded-full blur-3xl mix-blend-screen pointer-events-none"></div>
+          
+          <div className="flex items-center gap-5 mb-8 relative z-10">
+            <div className="w-20 h-20 rounded-[1.5rem] bg-[var(--color-primary-container)] flex items-center justify-center text-white text-3xl font-black font-headline shadow-[0_0_20px_rgba(0,163,173,0.3)]">
+              {perfil.nombre?.charAt(0)}{perfil.apellidos?.charAt(0)}
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold font-headline text-white tracking-tight leading-tight">
+                {perfil.nombre} {perfil.apellidos}
+              </h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-emerald-500/30">
+                  Paciente
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 relative z-10">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors">
+              <span className="material-symbols-outlined text-[var(--color-primary-container)]">mail</span>
+              <div>
+                <p className="text-xs text-white/50 font-bold uppercase tracking-widest mb-0.5">Correo Electrónico</p>
+                <p className="text-white font-medium">{perfil.correo}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors">
+              <span className="material-symbols-outlined text-[var(--color-primary-container)]">phone</span>
+              <div>
+                <p className="text-xs text-white/50 font-bold uppercase tracking-widest mb-0.5">Teléfono</p>
+                <p className="text-white font-medium">{perfil.telefono || "No especificado"}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors">
+              <span className="material-symbols-outlined text-[var(--color-primary-container)]">cake</span>
+              <div>
+                <p className="text-xs text-white/50 font-bold uppercase tracking-widest mb-0.5">Fecha de Nacimiento</p>
+                <p className="text-white font-medium">{perfil.fecha_nacimiento || "No especificada"}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors">
+              <span className="material-symbols-outlined text-[var(--color-primary-container)]">badge</span>
+              <div>
+                <p className="text-xs text-white/50 font-bold uppercase tracking-widest mb-0.5">Usuario</p>
+                <p className="text-white font-medium">@{perfil.usuario}</p>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
-
-      {/* Menu Options: Bento Glass Grid */}
-      <section className="grid grid-cols-1 gap-4">
-        {/* Datos Personales */}
-        <button
-          type="button"
-          onClick={() => window.alert("Puedes actualizar tus datos en ventanilla mientras se habilita la edición en app.")}
-          className="w-full text-left bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] p-5 flex items-center justify-between hover:bg-white/20 transition-all duration-300 active:scale-[0.98] group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[var(--color-primary-container)]/20 flex items-center justify-center text-[var(--color-primary-container)]">
-              <span className="material-symbols-outlined">account_circle</span>
-            </div>
-            <div>
-              <h3 className="font-semibold text-white">Datos Personales</h3>
-              <p className="text-xs text-white/60">Información básica y contacto</p>
-            </div>
-          </div>
-          <span className="material-symbols-outlined text-white/40 group-hover:text-[var(--color-primary-container)] transition-colors">chevron_right</span>
-        </button>
-
-        {/* Acerca de */}
-        <button
-          type="button"
-          onClick={handleAbout}
-          className="w-full text-left bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] p-5 flex items-center justify-between hover:bg-white/20 transition-all duration-300 active:scale-[0.98] group shadow-[0_8px_32px_0_rgba(0,0,0,0.2)]"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white/70">
-              <span className="material-symbols-outlined">info</span>
-            </div>
-            <div>
-              <h3 className="font-semibold text-white">Acerca de NexusSalud</h3>
-              <p className="text-xs text-white/60">Información de la plataforma</p>
-            </div>
-          </div>
-          <span className="material-symbols-outlined text-white/40 group-hover:text-[var(--color-primary-container)] transition-colors">chevron_right</span>
-        </button>
-
-      </section>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-white/50">Error al cargar el perfil.</p>
+        </div>
+      )}
     </main>
   );
 }
