@@ -55,8 +55,18 @@ export default function SecretariaCitas() {
     if (!window.confirm(`¿Cancelar la cita de ${pacienteNombre}?`)) return;
     setErrorMsg(""); setSuccessMsg("");
     const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
-    if (error) setErrorMsg(error.message);
-    else { setSuccessMsg("✓ Cita cancelada. El paciente recibirá una notificación automática."); fetchCitas(); }
+    
+    if (!error) {
+      await supabase.from("reembolsos").insert({
+        cita_id: id,
+        estado: "pendiente",
+        motivo: "Cancelada por la Secretaria (Reembolso aplicable)"
+      }).catch(() => {});
+      setSuccessMsg("✓ Cita cancelada. El paciente recibirá una notificación automática."); 
+      fetchCitas();
+    } else {
+      setErrorMsg(error.message);
+    }
   };
 
   const estadoBadge = (estado: string) => {

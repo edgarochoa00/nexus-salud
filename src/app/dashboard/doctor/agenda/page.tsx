@@ -39,9 +39,21 @@ export default function DoctorAgenda() {
 
   const handleCancelCita = async (id: number) => {
     if (!window.confirm("¿Cancelar esta cita? El paciente recibirá una notificación automática.")) return;
+    
+    // 1. Cancelar cita
     const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
-    if (error) alert("Error: " + error.message);
-    else fetchAgenda();
+    
+    // 2. Generar reembolso íntegro
+    if (!error) {
+      await supabase.from("reembolsos").insert({
+        cita_id: id,
+        estado: "pendiente",
+        motivo: "Cancelada por el Doctor (Reembolso aplicable)"
+      }).catch(() => {});
+      fetchAgenda();
+    } else {
+      alert("Error: " + error.message);
+    }
   };
 
   const handleCompletarCita = async (id: number) => {

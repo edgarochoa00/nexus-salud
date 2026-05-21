@@ -68,7 +68,11 @@ export default function ConfirmacionSecretaria() {
       .single();
 
     if (insertError) {
-      setError("Error al guardar la cita: " + insertError.message);
+      if (insertError.code === '23505' || insertError.message.includes('unique constraint')) {
+        setError("Ese horario acaba de ser reservado por otro paciente o medio. Por favor selecciona otro horario.");
+      } else {
+        setError("Error al guardar la cita: " + insertError.message);
+      }
       setLoading(false);
       return;
     }

@@ -62,7 +62,11 @@ export default function ConfirmacionPaciente() {
       .single();
 
     if (insertError) {
-      setError("Error al guardar la cita: " + insertError.message);
+      if (insertError.code === '23505' || insertError.message.includes('unique constraint')) {
+        setError("Lo sentimos, ese horario acaba de ser reservado por otro paciente. Por favor selecciona otro.");
+      } else {
+        setError("Error al guardar la cita: " + insertError.message);
+      }
       setLoading(false);
       return;
     }

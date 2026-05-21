@@ -14,6 +14,8 @@ export default function RegistroPaciente() {
   const supabase = createClient();
   const [formData, setFormData] = useState({
     nombre: "",
+    apellidos: "",
+    telefono: "",
     username: "",
     correo: "",
     password: "",
@@ -46,6 +48,8 @@ export default function RegistroPaciente() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nombre: formData.nombre,
+        apellidos: formData.apellidos,
+        telefono: formData.telefono,
         username: formData.username,
         email: formData.correo,
         password: formData.password,
@@ -83,9 +87,19 @@ export default function RegistroPaciente() {
 
           <form className="w-full flex flex-col gap-5" onSubmit={handleRegister}>
             <InputGlass
-              id="nombre" label="Nombre Completo" placeholder="Ej. Juan Pérez"
+              id="nombre" label="Nombre" placeholder="Ej. Juan"
               type="text" icon="person" value={formData.nombre}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            />
+            <InputGlass
+              id="apellidos" label="Apellidos" placeholder="Ej. Pérez Gómez"
+              type="text" icon="badge" value={formData.apellidos}
+              onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+            />
+            <InputGlass
+              id="telefono" label="Teléfono" placeholder="Ej. 5551234567"
+              type="tel" icon="phone" value={formData.telefono}
+              onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
             />
             <div>
               <InputGlass
