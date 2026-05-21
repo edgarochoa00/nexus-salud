@@ -21,8 +21,16 @@ export default function DoctorExpedientes() {
       .from("citas")
       .select(`
         paciente_id,
-        paciente:usuarios!paciente_id(id, nombre, apellidos, telefono, correo, pacientes(fecha_nacimiento)),
-        expedientes:pacientes!inner(
+        paciente:pacientes!paciente_id(
+          id,
+          fecha_nacimiento,
+          usuarios(
+            id,
+            nombre,
+            apellidos,
+            telefono,
+            correo
+          ),
           expedientes(
             id,
             consultas(id, fecha_hora, motivo, receta)
@@ -39,13 +47,41 @@ export default function DoctorExpedientes() {
       return;
     }
 
-    // Deduplicar por paciente_id
+    // Deduplicar por paciente_id y mapear a la estructura que espera la vista
     const seen = new Set<string>();
-    const unique = (data || []).filter((c: any) => {
-      if (seen.has(c.paciente_id)) return false;
-      seen.add(c.paciente_id);
-      return true;
-    });
+    const unique = (data || [])
+      .filter((c: any) => {
+        if (seen.has(c.paciente_id)) return false;
+        seen.add(c.paciente_id);
+        return true;
+      })
+      .map((c: any) => {
+        const pacRaw = c.paciente || {};
+        const usrRaw = pacRaw.usuarios || {};
+        const expRaw = pacRaw.expedientes || {};
+        
+        return {
+          paciente_id: c.paciente_id,
+          paciente: {
+            id: usrRaw.id,
+            nombre: usrRaw.nombre,
+            apellidos: usrRaw.apellidos,
+            telefono: usrRaw.telefono,
+            correo: usrRaw.correo,
+            pacientes: {
+              fecha_nacimiento: pacRaw.fecha_nacimiento
+            },
+            expedientes: [
+              {
+                expedientes: {
+                  id: expRaw.id,
+                  consultas: expRaw.consultas || []
+                }
+              }
+            ]
+          }
+        };
+      });
 
     setExpedientes(unique);
     setLoading(false);

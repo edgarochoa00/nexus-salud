@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { obtenerCitaEnProceso, limpiarCitaEnProceso } from "@/utils/citaStore";
@@ -10,31 +10,16 @@ export default function ConfirmacionSecretaria() {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [cita, setCita] = useState({
-    especialidad: "Cardiología",
-    doctor_nombre: "Dra. Elena Gómez",
-    doctor_id: "",
-    paciente_id: "",
-    paciente_nombre: "Paciente",
-    sucursal: "Clínica Principal",
-    fecha: new Date().toISOString().split("T")[0],
-    hora: "09:30",
-  });
+  const [cita, setCita] = useState<any>(null);
+
+  const loadCita = useCallback(() => {
+    const datos = obtenerCitaEnProceso();
+    setCita(datos);
+  }, []);
 
   useEffect(() => {
-    const datos = obtenerCitaEnProceso();
-    setCita(prev => ({
-      ...prev,
-      especialidad: datos.especialidad ?? prev.especialidad,
-      doctor_nombre: datos.doctor_nombre ?? prev.doctor_nombre,
-      doctor_id: datos.doctor_id ?? prev.doctor_id,
-      paciente_id: datos.paciente_id ?? prev.paciente_id,
-      paciente_nombre: datos.paciente_nombre ?? prev.paciente_nombre,
-      sucursal: datos.sucursal ?? prev.sucursal,
-      fecha: datos.fecha ?? prev.fecha,
-      hora: datos.hora ?? prev.hora,
-    }));
-  }, []);
+    loadCita();
+  }, [loadCita]);
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,50 +35,37 @@ export default function ConfirmacionSecretaria() {
 
     const datos = obtenerCitaEnProceso();
 
-    // Si no hay paciente_id del store, buscar el primero disponible
-    let pacienteId = datos.paciente_id;
-    if (!pacienteId) {
-      const { data: pacientes } = await supabase
-        .from("perfiles")
-        .select("id")
-        .eq("rol", "paciente")
-        .limit(1);
-      pacienteId = pacientes?.[0]?.id;
-    }
-
-    if (!pacienteId) {
+    if (!datos.paciente_id) {
       setError("Selecciona un paciente antes de confirmar la cita.");
       setLoading(false);
       return;
     }
 
-    // Si no hay doctor_id, buscar el primero
-    let doctorId = datos.doctor_id;
-    if (!doctorId) {
-      const { data: doctores } = await supabase
-        .from("perfiles")
-        .select("id")
-        .eq("rol", "doctor")
-        .limit(1);
-      doctorId = doctores?.[0]?.id;
-    }
-
-    if (!doctorId) {
-      setError("No hay doctores registrados en el sistema.");
+    if (!datos.doctor_id) {
+      setError("No se encontró el doctor seleccionado. Por favor reinicia el proceso.");
       setLoading(false);
       return;
     }
 
-    const { error: insertError } = await supabase.from("citas").insert({
-      paciente_id: pacienteId,
-      doctor_id: doctorId,
-      fecha: datos.fecha ?? cita.fecha,
-      hora: datos.hora ?? cita.hora,
-      especialidad: datos.especialidad ?? cita.especialidad,
-      sucursal: datos.sucursal ?? cita.sucursal,
-      estado: "confirmada",
-      notas: "Cita agendada por recepcionista.",
-    });
+    if (!datos.fecha || !datos.hora) {
+      setError("Por favor selecciona fecha y hora antes de confirmar.");
+      setLoading(false);
+      return;
+    }
+
+    // 1. Insert the cita
+    const { data: citaData, error: insertError } = await supabase
+      .from("citas")
+      .insert({
+        paciente_id: datos.paciente_id,
+        doctor_id: datos.doctor_id,
+        fecha: datos.fecha,
+        hora: datos.hora,
+        estado: "pendiente",
+        creada_por: user.id,
+      })
+      .select()
+      .single();
 
     if (insertError) {
       setError("Error al guardar la cita: " + insertError.message);
@@ -101,10 +73,32 @@ export default function ConfirmacionSecretaria() {
       return;
     }
 
+    // 2. Register payment (secretaria doesn't charge, so mark as pendiente with 0 anticipo)
+    const precio = datos.precio ?? 0;
+    const { error: pagoError } = await supabase.from("pagos").insert({
+      cita_id: citaData.id,
+      monto_total: precio,
+      anticipo: 0,
+      metodo_pago: "efectivo",
+      estatus: "pendiente",
+    });
+
+    if (pagoError) {
+      console.warn("Cita creada, pero hubo un problema registrando el pago:", pagoError.message);
+    }
+
     limpiarCitaEnProceso();
     alert("Cita agendada exitosamente en el sistema.");
     router.push("/dashboard/secretaria/citas");
   };
+
+  if (!cita) {
+    return (
+      <main className="relative z-10 pt-safe-24 pb-32 px-6 max-w-2xl mx-auto w-full flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin material-symbols-outlined text-[var(--color-primary-container)] text-5xl">progress_activity</div>
+      </main>
+    );
+  }
 
   const fechaDisplay = cita.fecha
     ? new Date(cita.fecha + "T00:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "long" })
@@ -118,9 +112,7 @@ export default function ConfirmacionSecretaria() {
       </div>
 
       {error && (
-        <div className="bg-red-500/20 border border-red-500/40 text-red-300 text-sm p-4 rounded-2xl">
-          {error}
-        </div>
+        <div className="bg-red-500/20 border border-red-500/40 text-red-300 text-sm p-4 rounded-2xl">{error}</div>
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -131,7 +123,7 @@ export default function ConfirmacionSecretaria() {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Especialidad</p>
-              <h3 className="text-lg font-headline font-bold text-white">{cita.especialidad}</h3>
+              <h3 className="text-lg font-headline font-bold text-white">{cita.especialidad ?? "—"}</h3>
             </div>
           </div>
           <div className="hidden md:block h-10 w-[1px] bg-white/10"></div>
@@ -141,7 +133,7 @@ export default function ConfirmacionSecretaria() {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Especialista</p>
-              <h3 className="text-lg font-headline font-bold text-white">{cita.doctor_nombre}</h3>
+              <h3 className="text-lg font-headline font-bold text-white">{cita.doctor_nombre ?? "—"}</h3>
             </div>
           </div>
         </div>
@@ -149,20 +141,20 @@ export default function ConfirmacionSecretaria() {
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 flex flex-col gap-2">
           <span className="material-symbols-outlined text-teal-400 text-3xl">location_on</span>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sucursal</p>
-          <p className="font-headline font-bold text-white">{cita.sucursal}</p>
+          <p className="font-headline font-bold text-white">{cita.sucursal ?? "—"}</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 flex flex-col gap-2 border-l-4 border-l-[var(--color-primary-container)]/50">
           <span className="material-symbols-outlined text-teal-400 text-3xl">calendar_today</span>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fecha y Hora</p>
-          <p className="font-headline font-bold text-white">{fechaDisplay} • {cita.hora}</p>
+          <p className="font-headline font-bold text-white">{fechaDisplay} • {cita.hora ?? "—"}</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 col-span-1 md:col-span-2 flex items-center gap-4">
           <span className="material-symbols-outlined text-teal-400 text-3xl">patient_list</span>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paciente</p>
-            <p className="font-headline font-bold text-white">{cita.paciente_nombre}</p>
+            <p className="font-headline font-bold text-white">{cita.paciente_nombre ?? "—"}</p>
           </div>
         </div>
       </section>

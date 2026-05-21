@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { obtenerCitaEnProceso, limpiarCitaEnProceso } from "@/utils/citaStore";
@@ -10,29 +10,16 @@ export default function ConfirmacionPaciente() {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [cita, setCita] = useState({
-    especialidad: "Cardiología",
-    doctor_nombre: "Dra. Elena Gómez",
-    sucursal: "Clínica Principal",
-    fecha: new Date().toISOString().split("T")[0],
-    hora: "09:30",
-    precio: 650,
-    doctor_id: "",
-  });
+  const [cita, setCita] = useState<any>(null);
+
+  const loadCita = useCallback(() => {
+    const datos = obtenerCitaEnProceso();
+    setCita(datos);
+  }, []);
 
   useEffect(() => {
-    const datos = obtenerCitaEnProceso();
-    setCita(prev => ({
-      ...prev,
-      especialidad: datos.especialidad ?? prev.especialidad,
-      doctor_nombre: datos.doctor_nombre ?? prev.doctor_nombre,
-      sucursal: datos.sucursal ?? prev.sucursal,
-      fecha: datos.fecha ?? prev.fecha,
-      hora: datos.hora ?? prev.hora,
-      precio: datos.precio ?? prev.precio,
-      doctor_id: datos.doctor_id ?? prev.doctor_id,
-    }));
-  }, []);
+    loadCita();
+  }, [loadCita]);
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,27 +35,31 @@ export default function ConfirmacionPaciente() {
 
     const datos = obtenerCitaEnProceso();
 
-    // Buscar un doctor disponible si no hay uno seleccionado en el store
-    let doctorId = datos.doctor_id;
-    if (!doctorId) {
-      const { data: doctores } = await supabase
-        .from("perfiles")
-        .select("id")
-        .eq("rol", "doctor")
-        .limit(1);
-      doctorId = doctores?.[0]?.id ?? user.id;
+    if (!datos.doctor_id) {
+      setError("No se encontró el doctor seleccionado. Por favor reinicia el proceso.");
+      setLoading(false);
+      return;
     }
 
-    const { error: insertError } = await supabase.from("citas").insert({
-      paciente_id: user.id,
-      doctor_id: doctorId,
-      fecha: datos.fecha ?? cita.fecha,
-      hora: datos.hora ?? cita.hora,
-      especialidad: datos.especialidad ?? cita.especialidad,
-      sucursal: datos.sucursal ?? cita.sucursal,
-      estado: "confirmada",
-      notas: "Cita agendada con pago del 50% en línea.",
-    });
+    if (!datos.fecha || !datos.hora) {
+      setError("Por favor selecciona fecha y hora antes de confirmar.");
+      setLoading(false);
+      return;
+    }
+
+    // 1. Insert the cita
+    const { data: citaData, error: insertError } = await supabase
+      .from("citas")
+      .insert({
+        paciente_id: user.id,
+        doctor_id: datos.doctor_id,
+        fecha: datos.fecha,
+        hora: datos.hora,
+        estado: "pendiente",
+        creada_por: user.id,
+      })
+      .select()
+      .single();
 
     if (insertError) {
       setError("Error al guardar la cita: " + insertError.message);
@@ -76,11 +67,35 @@ export default function ConfirmacionPaciente() {
       return;
     }
 
+    // 2. Insert the payment record (50% anticipo)
+    const precio = datos.precio ?? 0;
+    const anticipo = parseFloat((precio / 2).toFixed(2));
+
+    const { error: pagoError } = await supabase.from("pagos").insert({
+      cita_id: citaData.id,
+      monto_total: precio,
+      anticipo: anticipo,
+      metodo_pago: "tarjeta",
+      estatus: anticipo > 0 ? "parcial" : "pendiente",
+    });
+
+    if (pagoError) {
+      console.warn("Cita creada, pero hubo un problema registrando el pago:", pagoError.message);
+    }
+
     limpiarCitaEnProceso();
     router.push("/dashboard/paciente/citas");
   };
 
-  const precio50 = (cita.precio / 2).toFixed(2);
+  if (!cita) {
+    return (
+      <main className="relative z-10 pt-safe-24 pb-32 px-6 max-w-2xl mx-auto w-full flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin material-symbols-outlined text-[var(--color-primary-container)] text-5xl">progress_activity</div>
+      </main>
+    );
+  }
+
+  const precio50 = ((cita.precio ?? 0) / 2).toFixed(2);
   const fechaDisplay = cita.fecha
     ? new Date(cita.fecha + "T00:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "long" })
     : "—";
@@ -101,7 +116,7 @@ export default function ConfirmacionPaciente() {
         </div>
       )}
 
-      {/* Resumen */}
+      {/* Summary */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 col-span-1 md:col-span-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-4">
@@ -110,7 +125,7 @@ export default function ConfirmacionPaciente() {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Especialidad</p>
-              <h3 className="text-lg font-headline font-bold text-white">{cita.especialidad}</h3>
+              <h3 className="text-lg font-headline font-bold text-white">{cita.especialidad ?? "—"}</h3>
             </div>
           </div>
           <div className="hidden md:block h-10 w-[1px] bg-white/10"></div>
@@ -120,7 +135,7 @@ export default function ConfirmacionPaciente() {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Especialista</p>
-              <h3 className="text-lg font-headline font-bold text-white">{cita.doctor_nombre}</h3>
+              <h3 className="text-lg font-headline font-bold text-white">{cita.doctor_nombre ?? "—"}</h3>
             </div>
           </div>
         </div>
@@ -128,23 +143,23 @@ export default function ConfirmacionPaciente() {
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 flex flex-col gap-2">
           <span className="material-symbols-outlined text-teal-400 text-3xl">location_on</span>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sucursal</p>
-          <p className="font-headline font-bold text-white">{cita.sucursal}</p>
+          <p className="font-headline font-bold text-white">{cita.sucursal ?? "—"}</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 flex flex-col gap-2 border-l-4 border-l-[var(--color-primary-container)]/50">
           <span className="material-symbols-outlined text-teal-400 text-3xl">calendar_today</span>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fecha y Hora</p>
-          <p className="font-headline font-bold text-white">{fechaDisplay} • {cita.hora}</p>
+          <p className="font-headline font-bold text-white">{fechaDisplay} • {cita.hora ?? "—"}</p>
         </div>
       </section>
 
-      {/* Desglose de pago */}
+      {/* Payment breakdown */}
       <section className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-8">
         <h2 className="font-headline font-bold text-xl text-white mb-6">Resumen del Pago</h2>
         <div className="space-y-4">
           <div className="flex justify-between items-center text-slate-300">
             <span className="text-sm">Consulta de Especialidad</span>
-            <span className="font-medium text-white">${cita.precio}.00 MXN</span>
+            <span className="font-medium text-white">${cita.precio ?? 0}.00 MXN</span>
           </div>
           <div className="flex justify-between items-center text-slate-300">
             <span className="text-sm">IVA (16%)</span>
@@ -153,7 +168,7 @@ export default function ConfirmacionPaciente() {
           <div className="pt-4 border-t border-dashed border-white/10">
             <div className="flex justify-between items-center mb-1">
               <span className="text-sm font-bold text-slate-400">Total del Servicio</span>
-              <span className="text-lg font-extrabold text-white">${cita.precio}.00 MXN</span>
+              <span className="text-lg font-extrabold text-white">${cita.precio ?? 0}.00 MXN</span>
             </div>
             <div className="bg-[var(--color-primary-container)]/10 rounded-2xl p-4 mt-4 flex items-center justify-between border border-[var(--color-primary-container)]/20">
               <div>
@@ -172,7 +187,7 @@ export default function ConfirmacionPaciente() {
         </div>
       </section>
 
-      {/* Formulario de tarjeta */}
+      {/* Payment form */}
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="font-headline font-bold text-xl text-white">Método de Pago</h2>
