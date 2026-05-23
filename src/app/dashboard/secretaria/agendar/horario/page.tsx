@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { obtenerCitaEnProceso, guardarCitaEnProceso } from "@/utils/citaStore";
+import { createClient } from "@/utils/supabase/client";
 
 export default function SecretariaHorarioSelection() {
   const today = new Date();
@@ -10,6 +11,31 @@ export default function SecretariaHorarioSelection() {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const [cita, setCita] = useState<any>({});
+
+  const [schedules, setSchedules] = useState<any[]>([]);
+
+  
+  useEffect(() => {
+    setIsMounted(true);
+    const dataCita = obtenerCitaEnProceso();
+    setCita(dataCita);
+    const supabase = createClient();
+    const { doctor_id, sucursal } = dataCita;
+    if (doctor_id) {
+      supabase
+        .from("doctor_consultorios")
+        .select("dia_semana, hora_inicio, hora_fin, consultorios(sucursales(nombre))")
+        .eq("doctor_id", doctor_id)
+        .then(({ data }) => {
+          if (data) {
+            // Eliminamos el filtro por sucursal para que muestre TODOS los días del doctor
+            setSchedules(data);
+          }
+        });
+    }
+  }, []);
 
   const firstDay = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -21,8 +47,15 @@ export default function SecretariaHorarioSelection() {
     calendarDays.push({ date: new Date(currentYear, currentMonth, d) });
   }
 
-  const morningTimes = ["08:00", "09:00", "09:30", "10:00", "11:00", "11:30"];
-  const afternoonTimes = ["14:00", "15:00", "15:30", "16:00", "17:00", "18:00"];
+  
+  
+  const mapDiaSemana = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+  const isDayAvailable = (date: Date) => {
+    if (schedules.length === 0) return true; // Si no hay horarios, permite todos (fallback)
+    const dayName = mapDiaSemana[date.getDay()];
+    // Ojo: en BD puede decir "miércoles" con acento, normalizamos
+    return schedules.some(s => s.dia_semana.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === dayName);
+  };
 
   const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -46,8 +79,50 @@ export default function SecretariaHorarioSelection() {
     }
   }, [selectedDate, selectedTime]);
 
-  const cita = obtenerCitaEnProceso();
-  const canContinue = !!selectedDate && !!selectedTime;
+    const canContinue = !!selectedDate && !!selectedTime;
+
+  
+    const generateTimeSlots = () => {
+    if (!selectedDate || schedules.length === 0) return { morning: [], afternoon: [] };
+    const dayName = mapDiaSemana[selectedDate.getDay()];
+    const schedule = schedules.find(s => s.dia_semana.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === dayName);
+    if (!schedule) return { morning: [], afternoon: [] };
+
+    const slots: string[] = [];
+    let [currentH, currentM] = schedule.hora_inicio.split(":").map(Number);
+    const [endH, endM] = schedule.hora_fin.split(":").map(Number);
+    
+    while (currentH < endH || (currentH === endH && currentM < endM)) {
+      const timeStr = `${String(currentH).padStart(2, '0')}:${String(currentM).padStart(2, '0')}`;
+      slots.push(timeStr);
+      currentM += 30;
+      if (currentM >= 60) {
+        currentH += 1;
+        currentM -= 60;
+      }
+    }
+
+    return {
+      morning: slots.filter(t => parseInt(t.split(":")[0]) < 12),
+      afternoon: slots.filter(t => parseInt(t.split(":")[0]) >= 12)
+    };
+  };
+
+  const { morning: validMorningTimes, afternoon: validAfternoonTimes } = generateTimeSlots();
+
+  const isTodaySelected = selectedDate && selectedDate.toDateString() === today.toDateString();
+  const nowHour = today.getHours();
+  const nowMin = today.getMinutes();
+
+  const isTimePast = (timeStr: string) => {
+    if (!isTodaySelected) return false;
+    const [h, m] = timeStr.split(":").map(Number);
+    if (h < nowHour) return true;
+    if (h === nowHour && m <= nowMin) return true;
+    return false;
+  };
+
+  if (!isMounted) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin material-symbols-outlined text-4xl text-cyan-400">progress_activity</div></div>;
 
   return (
     <main className="relative z-10 px-6 pt-safe-24 pb-32 space-y-6 max-w-lg mx-auto w-full">
@@ -91,6 +166,7 @@ export default function SecretariaHorarioSelection() {
               if (!dayObj.date) return <div key={i} />;
               const d = dayObj.date;
               const isPast = d < today && d.toDateString() !== today.toDateString();
+              const isAvailable = isDayAvailable(d);
               const isSelected = selectedDate?.toDateString() === d.toDateString();
               const isToday = d.toDateString() === today.toDateString();
               return (
@@ -111,23 +187,56 @@ export default function SecretariaHorarioSelection() {
       {/* Times */}
       <section className="space-y-6">
         <div>
-          <h3 className="font-headline font-semibold text-xs text-white/40 mb-3 uppercase tracking-wider">Mañana</h3>
+          <h3 className="font-headline font-semibold text-xs text-white/40 mb-3 uppercase tracking-wider">Turno Matutino (Antes de las 12 PM)</h3>
           <div className="grid grid-cols-3 gap-3">
-            {morningTimes.map((time) => (
-              <button key={time} type="button" onClick={() => setSelectedTime(time)}
-                className={`py-3 rounded-xl text-sm transition-all active:scale-95 ${selectedTime === time ? "font-bold bg-[var(--color-primary-container)]/20 border border-[var(--color-primary-container)] text-[var(--color-primary-container)] shadow-[0_0_20px_rgba(0,163,173,0.6)]" : "bg-white/5 backdrop-blur-2xl border border-white/10 font-medium text-white hover:bg-white/10"}`}
-              >{time}</button>
-            ))}
+            {!selectedDate ? <p className="text-white/30 text-xs col-span-3">Selecciona un día primero</p> : validMorningTimes.length === 0 ? <p className="text-white/30 text-xs col-span-3">Sin horarios en este turno</p> : validMorningTimes.map((time) => {
+              const isPast = isTimePast(time);
+              const isSelected = selectedTime === time;
+              return (
+                <button
+                  key={time}
+                  type="button"
+                  disabled={isPast}
+                  onClick={() => handleTimeSelect(time)}
+                  className={`py-3 rounded-xl text-sm transition-all active:scale-95 ${
+                    isPast
+                      ? "opacity-30 cursor-not-allowed bg-white/5 border border-white/5 text-white/50"
+                      : isSelected
+                        ? "font-bold bg-[var(--color-primary-container)]/20 border border-[var(--color-primary-container)] text-[var(--color-primary-container)] shadow-[0_0_20px_rgba(0,163,173,0.6)]"
+                        : "bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_1px_1px_0_rgba(255,255,255,0.1)] font-medium text-white hover:bg-white/10"
+                  }`}
+                >
+                  {time}
+                </button>
+              );
+            })}
           </div>
         </div>
+
         <div>
-          <h3 className="font-headline font-semibold text-xs text-white/40 mb-3 uppercase tracking-wider">Tarde</h3>
+          <h3 className="font-headline font-semibold text-xs text-white/40 mb-3 uppercase tracking-wider">Turno Vespertino (Después de las 12 PM)</h3>
           <div className="grid grid-cols-3 gap-3">
-            {afternoonTimes.map((time) => (
-              <button key={time} type="button" onClick={() => setSelectedTime(time)}
-                className={`py-3 rounded-xl text-sm transition-all active:scale-95 ${selectedTime === time ? "font-bold bg-[var(--color-primary-container)]/20 border border-[var(--color-primary-container)] text-[var(--color-primary-container)] shadow-[0_0_20px_rgba(0,163,173,0.6)]" : "bg-white/5 backdrop-blur-2xl border border-white/10 font-medium text-white hover:bg-white/10"}`}
-              >{time}</button>
-            ))}
+            {!selectedDate ? <p className="text-white/30 text-xs col-span-3">Selecciona un día primero</p> : validAfternoonTimes.length === 0 ? <p className="text-white/30 text-xs col-span-3">Sin horarios en este turno</p> : validAfternoonTimes.map((time) => {
+              const isPast = isTimePast(time);
+              const isSelected = selectedTime === time;
+              return (
+                <button
+                  key={time}
+                  type="button"
+                  disabled={isPast}
+                  onClick={() => handleTimeSelect(time)}
+                  className={`py-3 rounded-xl text-sm transition-all active:scale-95 ${
+                    isPast
+                      ? "opacity-30 cursor-not-allowed bg-white/5 border border-white/5 text-white/50"
+                      : isSelected
+                        ? "font-bold bg-[var(--color-primary-container)]/20 border border-[var(--color-primary-container)] text-[var(--color-primary-container)] shadow-[0_0_20px_rgba(0,163,173,0.6)]"
+                        : "bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_1px_1px_0_rgba(255,255,255,0.1)] font-medium text-white hover:bg-white/10"
+                  }`}
+                >
+                  {time}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>

@@ -58,20 +58,38 @@ export default function ClientPage({ params }: { params: { id: string } }) {
     // 1. Marcar cita como cancelada
     await supabase.from("citas").update({ estado: "cancelada" }).eq("id", cita.id);
 
-    // 2. Gestionar el reembolso según la regla de 24h
-    if (!isLessThan24h) {
-      // Reembolso completo si es mayor a 24h
-      await supabase.from("reembolsos").insert({
+    // 2. Crear la cancelación
+    const { data: cancelacionData, error: cancelacionError } = await supabase
+      .from("cancelaciones")
+      .insert({
         cita_id: cita.id,
-        estado: "pendiente",
-        motivo: "Cancelación anticipada por paciente (>24h)"
-      }).catch(() => {}); // Ignorar si falla por schema mismatch en la demo
-    } else {
-      // Sin reembolso (penalización)
-      await supabase.from("cancelaciones").insert({
-        cita_id: cita.id,
-        motivo: "Cancelación tardía por paciente (<24h). Sin reembolso aplicable.",
-      }).catch(() => {});
+        motivo: isLessThan24h
+          ? "Cancelación tardía por paciente (<24h). Sin reembolso aplicable."
+          : "Cancelación anticipada por paciente (>24h)",
+        tipo: "paciente",
+        cancelado_por: "paciente"
+      })
+      .select()
+      .single();
+
+    if (cancelacionError) {
+      console.error("Error al registrar la cancelación:", cancelacionError);
+    }
+
+    // 3. Si hay anticipo/monto_total y es >24h, generar reembolso
+    if (!isLessThan24h && cancelacionData) {
+      const montoReembolso = (cita.pagos?.[0]?.anticipo || cita.pagos?.[0]?.monto_total || 0);
+      if (montoReembolso > 0) {
+        try {
+          await supabase.from("reembolsos").insert({
+            cancelacion_id: cancelacionData.id,
+            monto: montoReembolso,
+            estatus: "pendiente"
+          });
+        } catch (e) {
+          console.error("Error al registrar el reembolso:", e);
+        }
+      }
     }
 
     alert("Cita cancelada exitosamente.");

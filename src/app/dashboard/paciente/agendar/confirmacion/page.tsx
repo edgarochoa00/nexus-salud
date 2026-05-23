@@ -209,26 +209,26 @@ export default function ConfirmacionPaciente() {
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Número de tarjeta</label>
             <div className="relative">
               <input className="w-full bg-white/5 border border-white/10 rounded-xl h-14 px-5 focus:ring-2 focus:ring-[var(--color-primary-container)] text-white placeholder:text-white/20 font-medium"
-                placeholder="0000 0000 0000 0000" type="text" required />
+                placeholder="0000 0000 0000 0000" type="text" required maxLength={19} />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-white/20">credit_card</span>
             </div>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Nombre del titular</label>
             <input className="w-full bg-white/5 border border-white/10 rounded-xl h-14 px-5 focus:ring-2 focus:ring-[var(--color-primary-container)] text-white placeholder:text-white/20 font-medium"
-              placeholder="Como aparece en la tarjeta" type="text" required />
+              placeholder="Como aparece en la tarjeta" type="text" required maxLength={50} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Vencimiento</label>
               <input className="w-full bg-white/5 border border-white/10 rounded-xl h-14 px-5 focus:ring-2 focus:ring-[var(--color-primary-container)] text-white placeholder:text-white/20 font-medium"
-                placeholder="MM / AA" type="text" required />
+                placeholder="MM / AA" type="text" required maxLength={7} />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">CVV</label>
               <div className="relative">
                 <input className="w-full bg-white/5 border border-white/10 rounded-xl h-14 px-5 focus:ring-2 focus:ring-[var(--color-primary-container)] text-white placeholder:text-white/20 font-medium"
-                  placeholder="123" type="password" required />
+                  placeholder="123" type="password" required maxLength={4} />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-white/20">lock</span>
               </div>
             </div>

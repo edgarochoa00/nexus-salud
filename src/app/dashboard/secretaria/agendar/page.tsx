@@ -63,13 +63,13 @@ export default function SecretariaEspecialidadSelection() {
     <main className="relative pt-safe-24 pb-32 px-6 max-w-2xl mx-auto">
       <div className="mb-8 flex flex-col items-center">
         <span className="text-[var(--color-primary-container)] font-headline font-extrabold tracking-widest text-xs uppercase mb-2">
-          Paso 1 de 4
+          Paso 1 de 3
         </span>
         <div className="flex gap-2 w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <div className="w-1/4 h-full bg-[var(--color-primary-container)] shadow-[0_0_12px_rgba(0,163,173,0.6)]"></div>
-          <div className="w-1/4 h-full bg-white/5"></div>
-          <div className="w-1/4 h-full bg-white/5"></div>
-          <div className="w-1/4 h-full bg-white/5"></div>
+          <div className="w-1/3 h-full bg-[var(--color-primary-container)] shadow-[0_0_12px_rgba(0,163,173,0.6)]"></div>
+          <div className="w-1/3 h-full bg-white/5"></div>
+          <div className="w-1/3 h-full bg-white/5"></div>
+          <div className="w-1/3 h-full bg-white/5"></div>
         </div>
       </div>
 
@@ -114,7 +114,7 @@ export default function SecretariaEspecialidadSelection() {
                 className="w-full text-left px-4 py-3 hover:bg-white/10 transition-all border-b border-white/5 last:border-0"
               >
                 <p className="text-white font-medium text-sm">{p.nombre} {p.apellidos}</p>
-                <p className="text-white/40 text-xs">{p.usuario} · {p.correo}</p>
+                <p className="text-white/40 text-xs">{p.correo}</p>
               </button>
             ))}
           </div>
@@ -124,7 +124,7 @@ export default function SecretariaEspecialidadSelection() {
           <div className="mt-2 bg-[var(--color-primary-container)]/10 border border-[var(--color-primary-container)]/30 rounded-2xl px-4 py-3 flex justify-between items-center">
             <div>
               <p className="text-white font-medium text-sm">{selectedPaciente.nombre} {selectedPaciente.apellidos}</p>
-              <p className="text-white/40 text-xs">{selectedPaciente.usuario}</p>
+              <p className="text-white/40 text-xs"></p>
             </div>
             <button type="button" onClick={() => { setSelectedPaciente(null); setPacientes([]); }} className="text-white/40 hover:text-white text-xs">
               <span className="material-symbols-outlined text-sm">close</span>

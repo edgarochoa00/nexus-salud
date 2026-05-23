@@ -3,28 +3,31 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function POST(request: Request) {
   try {
-    const { nombre, apellidos, telefono, username, email, password, fecha_nacimiento } = await request.json();
+    const { nombre, apellidos, telefono, curp, email, password, fecha_nacimiento } = await request.json();
 
-    if (!username || !email || !password || !nombre || !apellidos || !telefono || !fecha_nacimiento) {
+    if (!curp || !password || !nombre || !apellidos || !fecha_nacimiento || (!email && !telefono)) {
       return NextResponse.json(
-        { error: "Faltan campos obligatorios" },
+        { error: "Faltan campos obligatorios o método de contacto" },
         { status: 400 }
       );
     }
 
     const supabaseAdmin = createAdminClient();
-    const usernameLower = username.toLowerCase().trim();
+    const curpUpper = curp.toUpperCase().trim();
+    
+    // Si no proveen email, generamos uno ficticio usando la CURP para cumplir el requerimiento de Supabase Auth
+    const emailToUse = email && email.trim() !== "" ? email.trim() : `${curpUpper.toLowerCase()}@nexussalud.app`;
 
     // Crear el usuario usando el Admin API con email_confirm: true
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
+      email: emailToUse,
       password: password,
       email_confirm: true,
       user_metadata: {
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
         telefono: telefono.trim(),
-        username: usernameLower,
+        curp: curpUpper,
         rol: "paciente",
         fecha_nacimiento: fecha_nacimiento,
       },

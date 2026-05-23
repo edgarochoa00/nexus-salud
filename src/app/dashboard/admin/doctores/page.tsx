@@ -12,7 +12,7 @@ export default function AdminRegistroDoctores() {
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
   const [correo, setCorreo] = useState("");
-  const [username, setUsername] = useState("");
+  const [curp, setCurp] = useState("");
   const [password, setPassword] = useState("");
   const [telefono, setTelefono] = useState("");
   const [especialidadId, setEspecialidadId] = useState("");
@@ -80,7 +80,7 @@ export default function AdminRegistroDoctores() {
           nombre,
           apellidos,
           correo,
-          username,
+          curp,
           password,
           telefono,
           especialidad_id: especialidadId,
@@ -100,7 +100,7 @@ export default function AdminRegistroDoctores() {
       setNombre("");
       setApellidos("");
       setCorreo("");
-      setUsername("");
+      setCurp("");
       setPassword("");
       setTelefono("");
       
@@ -180,8 +180,7 @@ export default function AdminRegistroDoctores() {
                       placeholder="Ricardo"
                       type="text"
                       required
-                      value={nombre}
-                      onChange={(e) => setNombre(e.target.value)}
+                      value={nombre} maxLength={50} onChange={(e) => setNombre(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
                   </div>
@@ -192,21 +191,19 @@ export default function AdminRegistroDoctores() {
                       placeholder="Milla"
                       type="text"
                       required
-                      value={apellidos}
-                      onChange={(e) => setApellidos(e.target.value)}
+                      value={apellidos} maxLength={50} onChange={(e) => setApellidos(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Correo Electrónico</label>
+                  <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Correo Electrónico (Opcional si usa Teléfono)</label>
                   <input
                     className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
                     placeholder="doctor@nexussalud.app"
                     type="email"
-                    required
-                    value={correo}
+                    value={correo} maxLength={100}
                     onChange={(e) => setCorreo(e.target.value)}
                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                   />
@@ -214,24 +211,26 @@ export default function AdminRegistroDoctores() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">ID Usuario (Login)</label>
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">CURP</label>
                     <input
                       className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
-                      placeholder="doctor_carlos"
+                      placeholder="CURP (18 caracteres)"
                       type="text"
                       required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      value={curp}
+                      maxLength={18}
+                      onChange={(e) => setCurp(e.target.value.toUpperCase())}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Teléfono</label>
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Teléfono (Opcional si usa Correo)</label>
                     <input
                       className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
                       placeholder="5512345678"
                       type="tel"
                       value={telefono}
+                      maxLength={10}
                       onChange={(e) => setTelefono(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
@@ -246,7 +245,7 @@ export default function AdminRegistroDoctores() {
                       placeholder="••••••••"
                       required
                       type={showPass ? "text" : "password"}
-                      value={password}
+                      value={password} maxLength={64}
                       onChange={(e) => setPassword(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
@@ -342,7 +341,7 @@ export default function AdminRegistroDoctores() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                        <span className="material-symbols-outlined">doctor</span>
+                        <span className="material-symbols-outlined">stethoscope</span>
                       </div>
                       <div>
                         <h3 className="font-bold text-white font-headline">
@@ -352,9 +351,7 @@ export default function AdminRegistroDoctores() {
                           {doc.especialidad_nombre}
                         </p>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs">badge</span> {doc.usuario}
-                          </span>
+                          
                           {doc.telefono && (
                             <span className="flex items-center gap-1">
                               <span className="material-symbols-outlined text-xs">call</span> {doc.telefono}

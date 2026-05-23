@@ -43,13 +43,44 @@ export default function DoctorAgenda() {
     // 1. Cancelar cita
     const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
     
-    // 2. Generar reembolso íntegro
     if (!error) {
-      await supabase.from("reembolsos").insert({
-        cita_id: id,
-        estado: "pendiente",
-        motivo: "Cancelada por el Doctor (Reembolso aplicable)"
-      }).catch(() => {});
+      try {
+        // 2. Crear la cancelación
+        const { data: cancelacionData, error: cancelacionError } = await supabase
+          .from("cancelaciones")
+          .insert({
+            cita_id: id,
+            motivo: "Cancelada por el Doctor (Reembolso aplicable)",
+            tipo: "medico",
+            cancelado_por: "doctor"
+          })
+          .select()
+          .single();
+
+        if (cancelacionError) {
+          console.error("Error al registrar la cancelación:", cancelacionError);
+        }
+
+        // 3. Obtener el pago asociado y generar reembolso
+        const { data: pagosData } = await supabase
+          .from("pagos")
+          .select("monto_total")
+          .eq("cita_id", id);
+
+        const pagoInfo = pagosData?.[0];
+        if (cancelacionData && pagoInfo) {
+          const montoReembolso = pagoInfo.monto_total || 0;
+          if (montoReembolso > 0) {
+            await supabase.from("reembolsos").insert({
+              cancelacion_id: cancelacionData.id,
+              monto: montoReembolso,
+              estatus: "pendiente"
+            });
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
       fetchAgenda();
     } else {
       alert("Error: " + error.message);

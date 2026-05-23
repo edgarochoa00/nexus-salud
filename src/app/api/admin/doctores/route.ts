@@ -64,24 +64,25 @@ export async function GET() {
 // 2. Crear un nuevo doctor (Auth + Trigger)
 export async function POST(request: Request) {
   try {
-    const { nombre, apellidos, correo, username, password, telefono, especialidad_id, precio_consulta } = await request.json();
+    const { nombre, apellidos, correo, curp, password, telefono, especialidad_id, precio_consulta } = await request.json();
 
-    if (!nombre || !apellidos || !correo || !username || !password) {
-      return NextResponse.json({ error: "Nombre, apellidos, correo, usuario y contraseña son obligatorios." }, { status: 400 });
+    if (!nombre || !apellidos || !curp || !password || (!correo && !telefono)) {
+      return NextResponse.json({ error: "Faltan campos obligatorios o de contacto." }, { status: 400 });
     }
 
     const supabaseAdmin = createAdminClient();
-    const usernameLower = username.toLowerCase().trim();
+    const curpUpper = curp.toUpperCase().trim();
+    const emailToUse = correo && correo.trim() !== "" ? correo.trim() : `${curpUpper.toLowerCase()}@nexussalud.app`;
 
     // Registrar en Supabase Auth usando Admin API. Esto no altera la sesión del administrador.
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email: correo.trim(),
+      email: emailToUse,
       password: password,
       email_confirm: true, // Evita validaciones de correo para pruebas rápidas
       user_metadata: {
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
-        username: usernameLower,
+        curp: curpUpper,
         rol: "doctor",
         telefono: telefono ? telefono.trim() : null,
         especialidad_id: especialidad_id ? Number(especialidad_id) : null,

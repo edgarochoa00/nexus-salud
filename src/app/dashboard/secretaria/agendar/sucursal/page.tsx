@@ -12,15 +12,51 @@ export default function SecretariaSucursalSelection() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
-    supabase.from("sucursales").select("*").order("nombre").then(({ data }) => {
-      setSucursales(data ?? []);
-      setLoading(false);
-      const { sucursal } = obtenerCitaEnProceso();
-      if (sucursal && data) {
-        const found = data.find((s: any) => s.nombre === sucursal);
-        if (found) setSelectedId(found.id);
-      }
-    });
+    const { doctor_id, sucursal } = obtenerCitaEnProceso();
+    if (!doctor_id) {
+      // Fallback si no hay doctor seleccionado, mostrar todas
+      supabase.from("sucursales").select("*").order("nombre").then(({ data }) => {
+        setSucursales(data ?? []);
+        setLoading(false);
+      });
+      return;
+    }
+
+    // Filtrar sucursales donde trabaja el doctor seleccionado
+    supabase
+      .from("doctor_consultorios")
+      .select(`
+        consultorios(
+          sucursales(id, nombre, direccion)
+        )
+      `)
+      .eq("doctor_id", doctor_id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Error fetching sucursales:", error);
+          setLoading(false);
+          return;
+        }
+        
+        // Extraer sucursales únicas
+        const uniqueSucursales = new Map();
+        data?.forEach((item: any) => {
+          const suc = item.consultorios?.sucursales;
+          if (suc && !uniqueSucursales.has(suc.id)) {
+            uniqueSucursales.set(suc.id, suc);
+          }
+        });
+        
+        const sucursalesFiltradas = Array.from(uniqueSucursales.values());
+        setSucursales(sucursalesFiltradas);
+        setLoading(false);
+
+        // Pre-seleccionar si ya estaba en el store y existe en las filtradas
+        if (sucursal) {
+          const found = sucursalesFiltradas.find((s: any) => s.nombre === sucursal);
+          if (found) setSelectedId(found.id);
+        }
+      });
   }, []);
 
   const handleSelect = (suc: any) => {

@@ -36,13 +36,13 @@ export default function SpecialtySelection() {
     <main className="relative pt-safe-24 pb-32 px-6 max-w-2xl mx-auto">
       <div className="mb-8 flex flex-col items-center">
         <span className="text-[var(--color-primary-container)] font-headline font-extrabold tracking-widest text-xs uppercase mb-2">
-          Paso 1 de 4
+          Paso 1 de 3
         </span>
         <div className="flex gap-2 w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <div className="w-1/4 h-full bg-[var(--color-primary-container)] shadow-[0_0_12px_rgba(0,163,173,0.6)]"></div>
-          <div className="w-1/4 h-full bg-white/5"></div>
-          <div className="w-1/4 h-full bg-white/5"></div>
-          <div className="w-1/4 h-full bg-white/5"></div>
+          <div className="w-1/3 h-full bg-[var(--color-primary-container)] shadow-[0_0_12px_rgba(0,163,173,0.6)]"></div>
+          <div className="w-1/3 h-full bg-white/5"></div>
+          <div className="w-1/3 h-full bg-white/5"></div>
+          <div className="w-1/3 h-full bg-white/5"></div>
         </div>
       </div>
 

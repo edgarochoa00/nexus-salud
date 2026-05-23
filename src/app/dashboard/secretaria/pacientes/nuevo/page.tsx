@@ -9,7 +9,7 @@ export default function NuevoPacienteSecretaria() {
   const [formData, setFormData] = useState({
     nombre: "",
     apellidos: "",
-    username: "",
+    curp: "",
     correo: "",
     telefono: "",
     curp: "",
@@ -31,7 +31,7 @@ export default function NuevoPacienteSecretaria() {
         body: JSON.stringify({
           nombre: formData.nombre,
           apellidos: formData.apellidos,
-          username: formData.username.toLowerCase(),
+          curp: formData.curp.toUpperCase(),
           email: formData.correo,
           password: formData.password,
           fecha_nacimiento: formData.fecha_nacimiento || "2000-01-01",
@@ -88,7 +88,7 @@ export default function NuevoPacienteSecretaria() {
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">person</span>
                 <input required type="text" placeholder="Ej. Juan"
                   className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
-                  value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  value={formData.nombre} maxLength={50} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                 />
               </div>
             </div>
@@ -98,21 +98,21 @@ export default function NuevoPacienteSecretaria() {
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">person</span>
                 <input required type="text" placeholder="Ej. Pérez"
                   className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
-                  value={formData.apellidos} onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                  value={formData.apellidos} maxLength={50} onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
                 />
               </div>
             </div>
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">ID de Usuario</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">badge</span>
-              <input required type="text" placeholder="Ej. juanperez (sin espacios)"
-                className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
-                value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s/g, "") })}
-              />
-            </div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-1 block">CURP</label>
+            <input
+              type="text"
+              placeholder="CURP (18 caracteres)"
+              maxLength={18}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-all"
+              value={formData.curp} onChange={(e) => setFormData({ ...formData, curp: e.target.value.toUpperCase().replace(/\s/g, "") })}
+            />
             <p className="text-[10px] text-white/40 mt-1 ml-1">El paciente usará este ID para iniciar sesión.</p>
           </div>
 
@@ -122,7 +122,7 @@ export default function NuevoPacienteSecretaria() {
               <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">mail</span>
               <input required type="email" placeholder="paciente@ejemplo.com"
                 className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
-                value={formData.correo} onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+                value={formData.correo} maxLength={100} onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
               />
             </div>
           </div>
@@ -133,7 +133,7 @@ export default function NuevoPacienteSecretaria() {
               <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-cyan-400/50">lock</span>
               <input required type="password" placeholder="••••••••"
                 className="w-full bg-white/5 border border-white/10 rounded-xl h-14 pl-12 pr-5 focus:ring-2 focus:ring-cyan-500 text-white placeholder:text-white/20 font-medium"
-                value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                value={formData.password} maxLength={64} onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
             </div>
           </div>

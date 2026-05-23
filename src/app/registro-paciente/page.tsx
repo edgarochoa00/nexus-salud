@@ -16,7 +16,7 @@ export default function RegistroPaciente() {
     nombre: "",
     apellidos: "",
     telefono: "",
-    username: "",
+    curp: "",
     correo: "",
     password: "",
     fecha_nacimiento: "",
@@ -29,16 +29,23 @@ export default function RegistroPaciente() {
     setError("");
     setLoading(true);
 
-    if (!formData.fecha_nacimiento) {
-      setError("Por favor selecciona tu fecha de nacimiento.");
+    const faltantes = [];
+    if (!formData.nombre.trim()) faltantes.push("Nombre");
+    if (!formData.apellidos.trim()) faltantes.push("Apellidos");
+    if (!formData.curp.trim()) faltantes.push("CURP");
+    if (!formData.fecha_nacimiento) faltantes.push("Fecha de Nacimiento");
+    if (!formData.password) faltantes.push("Contraseña");
+    if (!formData.correo.trim() && !formData.telefono.trim()) faltantes.push("Teléfono o Correo");
+
+    if (faltantes.length > 0) {
+      setError(`Faltan campos por completar: ${faltantes.join(", ")}.`);
       setLoading(false);
       return;
     }
 
-    // Validar que el username no tenga espacios o caracteres especiales
-    const usernameValido = /^[a-zA-Z0-9._-]{3,20}$/.test(formData.username);
-    if (!usernameValido) {
-      setError("El ID de usuario solo puede tener letras, números, puntos o guiones (3-20 caracteres).");
+    const curpValido = /^[A-Z0-9]{18}$/i.test(formData.curp);
+    if (!curpValido) {
+      setError("La CURP debe tener exactamente 18 caracteres alfanuméricos.");
       setLoading(false);
       return;
     }
@@ -50,7 +57,7 @@ export default function RegistroPaciente() {
         nombre: formData.nombre,
         apellidos: formData.apellidos,
         telefono: formData.telefono,
-        username: formData.username,
+        curp: formData.curp,
         email: formData.correo,
         password: formData.password,
         fecha_nacimiento: formData.fecha_nacimiento,
@@ -65,7 +72,7 @@ export default function RegistroPaciente() {
       return;
     }
 
-    alert(`¡Registro exitoso! Tu ID de usuario es: ${formData.username.toLowerCase()}\nConsérvalo para iniciar sesión.`);
+    alert(`¡Registro exitoso! Tu CURP de acceso es: ${formData.curp.toUpperCase()}\nConsérvala para iniciar sesión.`);
     router.push("/");
   };
 
@@ -88,26 +95,25 @@ export default function RegistroPaciente() {
           <form className="w-full flex flex-col gap-5" onSubmit={handleRegister}>
             <InputGlass
               id="nombre" label="Nombre" placeholder="Ej. Juan"
-              type="text" icon="person" value={formData.nombre}
+              type="text" icon="person" value={formData.nombre} maxLength={50}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
             />
             <InputGlass
               id="apellidos" label="Apellidos" placeholder="Ej. Pérez Gómez"
-              type="text" icon="badge" value={formData.apellidos}
+              type="text" icon="badge" value={formData.apellidos} maxLength={50}
               onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
             />
             <InputGlass
-              id="telefono" label="Teléfono" placeholder="Ej. 5551234567"
-              type="tel" icon="phone" value={formData.telefono}
+              id="telefono" label="Teléfono (Opcional si usas correo)" placeholder="Ej. 5551234567"
+              type="tel" icon="phone" value={formData.telefono} maxLength={10}
               onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
             />
             <div>
               <InputGlass
-                id="username" label="ID de Usuario" placeholder="Ej. juanperez (sin espacios)"
-                type="text" icon="badge" value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s/g, "") })}
+                id="curp" label="CURP" placeholder="Ingresa tus 18 caracteres"
+                type="text" icon="badge" value={formData.curp} maxLength={18}
+                onChange={(e) => setFormData({ ...formData, curp: e.target.value.toUpperCase().replace(/\s/g, "") })}
               />
-              <p className="text-[10px] text-white/40 mt-1 ml-1">Este será tu identificador para iniciar sesión. 3-20 caracteres.</p>
             </div>
             <InputGlass
               id="fecha_nacimiento" label="Fecha de Nacimiento"
@@ -115,13 +121,13 @@ export default function RegistroPaciente() {
               onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
             />
             <InputGlass
-              id="correo" label="Correo Electrónico" placeholder="correo@ejemplo.com"
-              type="email" icon="mail" value={formData.correo}
+              id="correo" label="Correo Electrónico (Opcional si usas teléfono)" placeholder="correo@ejemplo.com"
+              type="email" icon="mail" value={formData.correo} maxLength={100}
               onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
             />
             <InputGlass
               id="password" label="Contraseña" placeholder="••••••••"
-              type="password" icon="lock" value={formData.password}
+              type="password" icon="lock" value={formData.password} maxLength={64}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             />
 

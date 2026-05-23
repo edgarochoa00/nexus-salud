@@ -26,7 +26,8 @@ export default function MisCitasList() {
           id, fecha, hora, estado,
           doctor:doctores!doctor_id(usuarios(nombre, apellidos), especialidades(nombre)),
           consultorio:consultorios(nombre, sucursales(nombre)),
-          pagos(folio, monto_total, estatus)
+          pagos(folio, monto_total, estatus),
+          cancelaciones(motivo, reembolsos(estatus))
         `)
         .eq("paciente_id", user.id)
         .order("fecha", { ascending: vista === "proximas" }),
@@ -206,6 +207,22 @@ export default function MisCitasList() {
                     {especialidad && (
                       <p className="text-xs text-cyan-300 font-semibold uppercase tracking-widest">{especialidad}</p>
                     )}
+                    
+                    {/* Sección de Reembolsos / Cancelaciones */}
+                    {cita.estado === "cancelada" && (
+                      <div className="mt-2 flex flex-col gap-1">
+                        {cita.cancelaciones?.[0]?.reembolsos && cita.cancelaciones[0].reembolsos.length > 0 && (
+                          <span className="inline-block text-[10px] font-bold px-2 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md">
+                            Reembolso: {cita.cancelaciones[0].reembolsos[0].estatus}
+                          </span>
+                        )}
+                        {cita.cancelaciones && cita.cancelaciones.length > 0 && (
+                          <span className="inline-block text-[10px] font-bold px-2 py-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded-md">
+                            Penalización: Sin Reembolso (&lt; 24h)
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 text-white/50 text-xs mt-0.5">
                       <span className="material-symbols-outlined text-xs">location_on</span>
                       {con?.nombre || "—"}{con?.sucursales?.nombre && ` · ${con.sucursales.nombre}`}
@@ -216,13 +233,12 @@ export default function MisCitasList() {
                 {/* Acciones */}
                 <div className="flex items-center gap-3">
                   {(cita.estado === "pendiente" || cita.estado === "confirmada") && (
-                    <button
-                      type="button"
-                      onClick={() => handleCancelar(cita.id)}
-                      className="px-5 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold hover:bg-red-500/20 transition-all active:scale-95"
+                    <Link
+                      href={`/dashboard/paciente/citas/${cita.id}`}
+                      className="px-5 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold hover:bg-red-500/20 transition-all text-center inline-block"
                     >
-                      Cancelar
-                    </button>
+                      Ver Detalle / Cancelar
+                    </Link>
                   )}
                   {cita.estado === "completada" && (
                     <Link

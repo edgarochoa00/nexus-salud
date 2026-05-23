@@ -61,7 +61,7 @@ export default function ConfirmacionSecretaria() {
         doctor_id: datos.doctor_id,
         fecha: datos.fecha,
         hora: datos.hora,
-        estado: "pendiente",
+        estado: "confirmada",
         creada_por: user.id,
       })
       .select()

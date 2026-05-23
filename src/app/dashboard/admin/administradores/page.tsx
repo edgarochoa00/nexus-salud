@@ -12,7 +12,7 @@ export default function AdminRegistroAdministradores() {
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
   const [correo, setCorreo] = useState("");
-  const [username, setUsername] = useState("");
+  const [curp, setCurp] = useState("");
   const [password, setPassword] = useState("");
   const [telefono, setTelefono] = useState("");
   
@@ -70,7 +70,7 @@ export default function AdminRegistroAdministradores() {
           nombre,
           apellidos,
           correo,
-          username,
+          curp,
           password,
           telefono,
         }),
@@ -88,7 +88,7 @@ export default function AdminRegistroAdministradores() {
       setNombre("");
       setApellidos("");
       setCorreo("");
-      setUsername("");
+      setCurp("");
       setPassword("");
       setTelefono("");
       
@@ -172,8 +172,7 @@ export default function AdminRegistroAdministradores() {
                       placeholder="Ej. Carlos"
                       type="text"
                       required
-                      value={nombre}
-                      onChange={(e) => setNombre(e.target.value)}
+                      value={nombre} maxLength={50} onChange={(e) => setNombre(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
                   </div>
@@ -184,21 +183,19 @@ export default function AdminRegistroAdministradores() {
                       placeholder="Ej. Gómez"
                       type="text"
                       required
-                      value={apellidos}
-                      onChange={(e) => setApellidos(e.target.value)}
+                      value={apellidos} maxLength={50} onChange={(e) => setApellidos(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Correo Electrónico</label>
+                  <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Correo Electrónico (Opcional si usa Teléfono)</label>
                   <input
                     className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
                     placeholder="admin@nexussalud.app"
                     type="email"
-                    required
-                    value={correo}
+                    value={correo} maxLength={100}
                     onChange={(e) => setCorreo(e.target.value)}
                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                   />
@@ -206,19 +203,20 @@ export default function AdminRegistroAdministradores() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">ID Usuario (Login)</label>
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">CURP</label>
                     <input
-                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
-                      placeholder="admin_nexus"
+                      className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none focus:border-[#00a3ad]"
+                      placeholder="CURP (18 caracteres)"
                       type="text"
                       required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      value={curp}
+                      maxLength={18}
+                      onChange={(e) => setCurp(e.target.value.toUpperCase())}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Teléfono</label>
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest ml-1">Teléfono (Opcional si usa Correo)</label>
                     <input
                       className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none"
                       placeholder="5534567890"
@@ -238,7 +236,7 @@ export default function AdminRegistroAdministradores() {
                       placeholder="••••••••"
                       required
                       type={showPass ? "text" : "password"}
-                      value={password}
+                      value={password} maxLength={64}
                       onChange={(e) => setPassword(e.target.value)}
                       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                     />
@@ -306,9 +304,7 @@ export default function AdminRegistroAdministradores() {
                           {admin.nombre} {admin.apellidos} {admin.id === currentUserId && <span className="text-xs text-cyan-300 font-bold bg-cyan-950 px-2 py-0.5 rounded-full ml-2">Tú</span>}
                         </h3>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 mt-1">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs">badge</span> {admin.usuario}
-                          </span>
+                          
                           <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-xs">mail</span> {admin.correo}
                           </span>

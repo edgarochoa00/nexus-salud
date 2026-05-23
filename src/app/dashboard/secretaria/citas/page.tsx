@@ -54,14 +54,44 @@ export default function SecretariaCitas() {
   const handleCancelar = async (id: number, pacienteNombre: string) => {
     if (!window.confirm(`¿Cancelar la cita de ${pacienteNombre}?`)) return;
     setErrorMsg(""); setSuccessMsg("");
+    
+    // 1. Cancelar cita
     const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
     
     if (!error) {
-      await supabase.from("reembolsos").insert({
-        cita_id: id,
-        estado: "pendiente",
-        motivo: "Cancelada por la Secretaria (Reembolso aplicable)"
-      }).catch(() => {});
+      try {
+        // 2. Crear la cancelación
+        const { data: cancelacionData, error: cancelacionError } = await supabase
+          .from("cancelaciones")
+          .insert({
+            cita_id: id,
+            motivo: "Cancelada por la Secretaria (Reembolso aplicable)",
+            tipo: "admin",
+            cancelado_por: "secretaria"
+          })
+          .select()
+          .single();
+
+        if (cancelacionError) {
+          console.error("Error al registrar la cancelación:", cancelacionError);
+        }
+
+        // 3. Generar reembolso si hay pago asociado
+        const matchingCita = citas.find(c => c.id === id);
+        const pagoInfo = matchingCita?.pagos?.[0];
+        if (cancelacionData && pagoInfo) {
+          const montoReembolso = pagoInfo.monto_total || 0;
+          if (montoReembolso > 0) {
+            await supabase.from("reembolsos").insert({
+              cancelacion_id: cancelacionData.id,
+              monto: montoReembolso,
+              estatus: "pendiente"
+            });
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
       setSuccessMsg("✓ Cita cancelada. El paciente recibirá una notificación automática."); 
       fetchCitas();
     } else {

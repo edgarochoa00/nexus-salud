@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function POST(request: Request) {
-  const { username } = await request.json();
+  const { curp } = await request.json();
 
-  if (!username) {
-    return NextResponse.json({ error: "Username requerido" }, { status: 400 });
+  if (!curp) {
+    return NextResponse.json({ error: "CURP requerido" }, { status: 400 });
   }
 
   const supabaseAdmin = createAdminClient();
 
-  // Listar todos los usuarios y buscar por username en metadata
+  // Listar todos los usuarios y buscar por curp en metadata
   const { data, error } = await supabaseAdmin.auth.admin.listUsers({
     page: 1,
     perPage: 1000,
@@ -21,15 +21,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Error interno del servidor (posible falta de SERVICE_ROLE_KEY)" }, { status: 500 });
   }
 
-  const usernameLower = username.toLowerCase().trim();
+  const curpUpper = curp.toUpperCase().trim();
 
-  // Buscar usuario donde:
-  // 1. raw_user_meta_data->>'username' == username (registros nuevos)
-  // 2. O el prefijo del correo == username (registros anteriores)
+  // Buscar usuario donde el CURP coincida (en metadata o en prefijo si en caso remoto lo guardaban ahí)
   const found = data.users.find((u) => {
-    const metaUsername = u.user_metadata?.username?.toLowerCase();
-    const emailPrefix = u.email?.split("@")[0]?.toLowerCase();
-    return metaUsername === usernameLower || emailPrefix === usernameLower;
+    const metaCurp = u.user_metadata?.curp?.toUpperCase();
+    return metaCurp === curpUpper;
   });
 
   if (!found || !found.email) {

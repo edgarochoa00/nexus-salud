@@ -80,7 +80,7 @@ export default function SecretariaDoctorSelection() {
   return (
     <main className="relative pt-safe-24 pb-32 px-6 max-w-2xl mx-auto w-full z-10">
       <div className="mb-8 flex flex-col">
-        <span className="text-[10px] uppercase tracking-widest text-cyan-400 font-bold opacity-80">Paso 2 de 4</span>
+        <span className="text-[10px] uppercase tracking-widest text-cyan-400 font-bold opacity-80">Paso 2 de 3</span>
         <h1 className="text-2xl font-bold tracking-tight text-white font-headline">Selección de Doctor</h1>
         {especialidadFiltro && (
           <p className="text-xs text-[var(--color-primary-container)] mt-1">Filtrando por: {especialidadFiltro}</p>
@@ -164,7 +164,7 @@ export default function SecretariaDoctorSelection() {
 
       <div className="mt-8">
         <Link
-          href="/dashboard/secretaria/agendar/sucursal"
+          href="/dashboard/secretaria/agendar/horario"
           className={`block w-full text-center py-5 rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-container)] text-white font-headline font-bold text-lg transition-all ${
             !selectedDoctorId ? "opacity-40 pointer-events-none" : "hover:scale-[1.02] active:scale-95"
           }`}

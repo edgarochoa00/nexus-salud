@@ -11,7 +11,7 @@ import { createClient } from "@/utils/supabase/client";
 export default function UniversalLogin() {
   const router = useRouter();
   const supabase = createClient();
-  const [username, setUsername] = useState("");
+  const [curp, setCurp] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,15 +22,15 @@ export default function UniversalLogin() {
     setLoading(true);
 
     try {
-      // 1. Buscar el correo asociado al username vía API route (server-side seguro)
+      // 1. Buscar el correo asociado al curp vía API route (server-side seguro)
       const res = await fetch("/api/auth/find-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim() }),
+        body: JSON.stringify({ curp: curp.trim() }),
       });
 
       if (!res.ok) {
-        setError("Usuario no encontrado. Verifica tu ID de usuario.");
+        setError("Usuario no encontrado. Verifica tu CURP.");
         return;
       }
 
@@ -109,13 +109,14 @@ export default function UniversalLogin() {
 
           <form className="w-full flex flex-col gap-5" onSubmit={handleLogin}>
             <InputGlass
-              id="username"
-              label="ID de Usuario"
-              placeholder="Ej. juanperez"
+              id="curp"
+              label="CURP"
+              placeholder="Ingresa tu CURP de 18 caracteres"
               type="text"
               icon="badge"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={curp}
+              maxLength={18}
+              onChange={(e) => setCurp(e.target.value.toUpperCase())}
             />
             <InputGlass
               id="password"
@@ -123,7 +124,7 @@ export default function UniversalLogin() {
               placeholder="••••••••"
               type="password"
               icon="lock"
-              value={password}
+              value={password} maxLength={64}
               onChange={(e) => setPassword(e.target.value)}
             />
 

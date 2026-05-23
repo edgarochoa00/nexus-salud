@@ -16,7 +16,7 @@ export default function PacientePerfil() {
     const { data, error } = await supabase
       .from("usuarios")
       .select(`
-        nombre, apellidos, correo, telefono, usuario,
+        nombre, apellidos, correo, telefono, curp,
         pacientes(fecha_nacimiento)
       `)
       .eq("id", user.id)
@@ -25,7 +25,7 @@ export default function PacientePerfil() {
     if (!error && data) {
       setPerfil({
         ...data,
-        fecha_nacimiento: data.pacientes?.[0]?.fecha_nacimiento || data.pacientes?.fecha_nacimiento
+        fecha_nacimiento: (data.pacientes as any)?.[0]?.fecha_nacimiento || (data.pacientes as any)?.fecha_nacimiento
       });
     }
     setLoading(false);
@@ -94,8 +94,8 @@ export default function PacientePerfil() {
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined text-[var(--color-primary-container)]">badge</span>
               <div>
-                <p className="text-xs text-white/50 font-bold uppercase tracking-widest mb-0.5">Usuario</p>
-                <p className="text-white font-medium">@{perfil.usuario}</p>
+                <p className="text-xs text-white/50 font-bold uppercase tracking-widest mb-0.5">CURP</p>
+                <p className="text-white font-medium">{perfil.curp || "No asignada"}</p>
               </div>
             </div>
           </div>
