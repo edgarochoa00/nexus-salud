@@ -81,7 +81,7 @@ export default function ExpedienteMedico() {
   const fechaNac = pacData?.pacientes?.[0]?.fecha_nacimiento || pacData?.pacientes?.fecha_nacimiento;
 
   return (
-    <main className="pb-32 px-5 max-w-lg mx-auto space-y-8 relative z-10 w-full" style={{ paddingTop: "1.5rem" }}>
+    <main className="pb-32 px-5 pt-28 max-w-lg mx-auto space-y-8 relative z-10 w-full">
       <div className="mb-6">
         <h1 className="font-headline font-bold text-3xl tracking-tight text-white mb-1">Expediente Médico</h1>
         <p className="text-white/50 text-sm">Tu historial de consultas y datos personales.</p>

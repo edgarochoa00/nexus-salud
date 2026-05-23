@@ -94,9 +94,35 @@ export default function HorarioSelection() {
     }
   }, [selectedDate, selectedTime]);
 
-    const canContinue = !!selectedDate && !!selectedTime;
+  const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [loadingHours, setLoadingHours] = useState(false);
 
-  
+  useEffect(() => {
+    if (selectedDate && cita.doctor_id) {
+      setLoadingHours(true);
+      const yyyy = selectedDate.getFullYear();
+      const mm = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(selectedDate.getDate()).padStart(2, "0");
+      const fechaStr = `${yyyy}-${mm}-${dd}`;
+
+      const supabase = createClient();
+      supabase
+        .rpc("obtener_horarios_ocupados", {
+          p_doctor_id: cita.doctor_id,
+          p_fecha: fechaStr
+        })
+        .then(({ data }) => {
+          if (data) {
+            setBookedTimes(data.map((d: any) => d.hora.slice(0, 5)));
+          }
+          setLoadingHours(false);
+        });
+    } else {
+      setBookedTimes([]);
+    }
+  }, [selectedDate, cita.doctor_id]);
+
+  const canContinue = !!selectedDate && !!selectedTime;
     const generateTimeSlots = () => {
     if (!selectedDate || schedules.length === 0) return { morning: [], afternoon: [] };
     const dayName = mapDiaSemana[selectedDate.getDay()];
@@ -224,22 +250,25 @@ export default function HorarioSelection() {
           <div className="grid grid-cols-3 gap-3">
             {!selectedDate ? <p className="text-white/30 text-xs col-span-3">Selecciona un día primero</p> : validMorningTimes.length === 0 ? <p className="text-white/30 text-xs col-span-3">Sin horarios en este turno</p> : validMorningTimes.map((time) => {
               const isPast = isTimePast(time);
+              const isBooked = bookedTimes.includes(time);
+              const isDisabled = isPast || isBooked;
               const isSelected = selectedTime === time;
               return (
                 <button
                   key={time}
                   type="button"
-                  disabled={isPast}
+                  disabled={isDisabled}
                   onClick={() => handleTimeSelect(time)}
-                  className={`py-3 rounded-xl text-sm transition-all active:scale-95 ${
-                    isPast
-                      ? "opacity-30 cursor-not-allowed bg-white/5 border border-white/5 text-white/50"
+                  className={`py-3 flex flex-col items-center justify-center gap-1 rounded-xl text-sm transition-all active:scale-95 ${
+                    isDisabled
+                      ? "opacity-40 cursor-not-allowed bg-red-900/10 border border-red-500/10 text-red-400"
                       : isSelected
                         ? "font-bold bg-[var(--color-primary-container)]/20 border border-[var(--color-primary-container)] text-[var(--color-primary-container)] shadow-[0_0_20px_rgba(0,163,173,0.6)]"
                         : "bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_1px_1px_0_rgba(255,255,255,0.1)] font-medium text-white hover:bg-white/10"
                   }`}
                 >
-                  {time}
+                  <span className={isBooked ? "line-through" : ""}>{time}</span>
+                  {isBooked && <span className="text-[9px] uppercase tracking-wider font-bold">Ocupado</span>}
                 </button>
               );
             })}
@@ -251,22 +280,25 @@ export default function HorarioSelection() {
           <div className="grid grid-cols-3 gap-3">
             {!selectedDate ? <p className="text-white/30 text-xs col-span-3">Selecciona un día primero</p> : validAfternoonTimes.length === 0 ? <p className="text-white/30 text-xs col-span-3">Sin horarios en este turno</p> : validAfternoonTimes.map((time) => {
               const isPast = isTimePast(time);
+              const isBooked = bookedTimes.includes(time);
+              const isDisabled = isPast || isBooked;
               const isSelected = selectedTime === time;
               return (
                 <button
                   key={time}
                   type="button"
-                  disabled={isPast}
+                  disabled={isDisabled}
                   onClick={() => handleTimeSelect(time)}
-                  className={`py-3 rounded-xl text-sm transition-all active:scale-95 ${
-                    isPast
-                      ? "opacity-30 cursor-not-allowed bg-white/5 border border-white/5 text-white/50"
+                  className={`py-3 flex flex-col items-center justify-center gap-1 rounded-xl text-sm transition-all active:scale-95 ${
+                    isDisabled
+                      ? "opacity-40 cursor-not-allowed bg-red-900/10 border border-red-500/10 text-red-400"
                       : isSelected
                         ? "font-bold bg-[var(--color-primary-container)]/20 border border-[var(--color-primary-container)] text-[var(--color-primary-container)] shadow-[0_0_20px_rgba(0,163,173,0.6)]"
                         : "bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_1px_1px_0_rgba(255,255,255,0.1)] font-medium text-white hover:bg-white/10"
                   }`}
                 >
-                  {time}
+                  <span className={isBooked ? "line-through" : ""}>{time}</span>
+                  {isBooked && <span className="text-[9px] uppercase tracking-wider font-bold">Ocupado</span>}
                 </button>
               );
             })}

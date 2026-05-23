@@ -11,6 +11,7 @@ export default function DoctorDashboard() {
   const [especialidad, setEspecialidad] = useState("");
   const [stats, setStats] = useState({ hoy: 0, pendientes: 0, completadas: 0, expedientes: 0 });
   const [citasHoy, setCitasHoy] = useState<any[]>([]);
+  const [citasProximas, setCitasProximas] = useState<any[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -20,7 +21,7 @@ export default function DoctorDashboard() {
       const hoy = new Date().toISOString().split("T")[0];
 
       // Cargar datos del doctor en paralelo
-      const [usuarioRes, citasHoyRes, citasPendientesRes, completadasRes] = await Promise.all([
+      const [usuarioRes, citasHoyRes, citasProximasRes, citasPendientesRes, completadasRes] = await Promise.all([
         supabase
           .from("usuarios")
           .select(`nombre, apellidos, doctores(especialidades(nombre))`)
@@ -35,8 +36,21 @@ export default function DoctorDashboard() {
           `)
           .eq("doctor_id", user.id)
           .eq("fecha", hoy)
-          .in("estado", ["pendiente", "confirmada"])
+          .eq("estado", "confirmada")
           .order("hora", { ascending: true }),
+        supabase
+          .from("citas")
+          .select(`
+            id, fecha, hora, estado,
+            paciente:pacientes!paciente_id(usuarios(nombre, apellidos)),
+            consultorio:consultorios(nombre)
+          `)
+          .eq("doctor_id", user.id)
+          .neq("fecha", hoy)
+          .in("estado", ["pendiente", "confirmada"])
+          .order("fecha", { ascending: true })
+          .order("hora", { ascending: true })
+          .limit(3),
         supabase
           .from("citas")
           .select("id", { count: "exact", head: true })
@@ -57,6 +71,7 @@ export default function DoctorDashboard() {
       }
 
       setCitasHoy(citasHoyRes.data || []);
+      setCitasProximas(citasProximasRes.data || []);
       setStats({
         hoy: citasHoyRes.data?.length || 0,
         pendientes: citasPendientesRes.count || 0,
@@ -174,19 +189,72 @@ export default function DoctorDashboard() {
                         </p>
                       </div>
                     </div>
-                    {isFirst && (
-                      <Link
-                        href="/dashboard/doctor/consultas"
-                        className="bg-[#00a3ad] hover:bg-[#00a3ad]/90 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all active:scale-95"
-                      >
-                        Atender
-                      </Link>
-                    )}
+                    <Link
+                      href={`/dashboard/doctor/consultas?cita_id=${cita.id}`}
+                      className="bg-[#00a3ad] hover:bg-[#00a3ad]/90 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      Atender
+                    </Link>
                   </div>
                 );
               })}
             </div>
           )}
+        </div>
+
+        {/* Próximas Citas */}
+        <div className="mb-8 bg-white/5 border border-white/10 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl mix-blend-screen pointer-events-none"></div>
+          
+          <div className="flex justify-between items-center mb-6 relative z-10">
+            <h3 className="text-xl font-bold font-headline text-white tracking-tight flex items-center gap-2">
+              Próximas Citas (Pendientes)
+            </h3>
+            <Link href="/dashboard/doctor/agenda" className="text-[10px] font-bold text-amber-300 uppercase tracking-widest hover:text-amber-200 transition-colors">
+              Ver Todo
+            </Link>
+          </div>
+
+          <div className="space-y-3 relative z-10">
+            {citasProximas.length === 0 ? (
+              <div className="text-center py-6">
+                <span className="material-symbols-outlined text-3xl text-white/20 mb-2">event_busy</span>
+                <p className="text-white/40 text-sm">No tienes citas futuras pendientes.</p>
+              </div>
+            ) : (
+              citasProximas.map((cita: any, i: number) => {
+                const pac = cita.paciente;
+                const con = cita.consultorio;
+                return (
+                  <div
+                    key={cita.id}
+                    className="flex items-center justify-between p-4 rounded-2xl border bg-white/5 border-white/10 transition-all hover:bg-white/10"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-xl flex flex-col items-center justify-center text-xs font-black bg-white/5 text-white/60">
+                        <span className="text-[10px] uppercase font-semibold leading-none mb-0.5">{new Date(cita.fecha).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</span>
+                        <span>{formatHora(cita.hora)}</span>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white">
+                          {pac?.usuarios ? `${pac.usuarios.nombre} ${pac.usuarios.apellidos}` : "Paciente"}
+                        </h4>
+                        <p className="text-xs text-white/50 mt-0.5">
+                          {con?.nombre || "Consultorio"} · <span className={`font-semibold text-amber-300`}>POR ATENDER</span>
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/dashboard/doctor/consultas?cita_id=${cita.id}`}
+                      className="bg-[#00a3ad]/20 border border-[#00a3ad]/30 text-[#00a3ad] hover:bg-[#00a3ad]/30 px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      Atender
+                    </Link>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* Accesos Rápidos */}

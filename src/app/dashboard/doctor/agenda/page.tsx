@@ -87,12 +87,7 @@ export default function DoctorAgenda() {
     }
   };
 
-  const handleCompletarCita = async (id: number) => {
-    if (!window.confirm("¿Marcar esta cita como completada?")) return;
-    const { error } = await supabase.from("citas").update({ estado: "completada" }).eq("id", id);
-    if (error) alert("Error: " + error.message);
-    else fetchAgenda();
-  };
+
 
   const hoy = new Date().toISOString().split("T")[0];
 
@@ -219,13 +214,12 @@ export default function DoctorAgenda() {
                     <div className="flex flex-col gap-2 shrink-0">
                       {(cita.estado === "pendiente" || cita.estado === "confirmada") && (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => handleCompletarCita(cita.id)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-all active:scale-95"
+                          <Link
+                            href={`/dashboard/doctor/consultas?cita_id=${cita.id}`}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-all active:scale-95 text-center"
                           >
-                            Completar
-                          </button>
+                            Atender
+                          </Link>
                           <button
                             type="button"
                             onClick={() => handleCancelCita(cita.id)}

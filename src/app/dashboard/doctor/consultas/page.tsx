@@ -7,10 +7,12 @@ import { createClient } from "@/utils/supabase/client";
 export default function DoctorConsultas() {
   const supabase = createClient();
   const [citasCompletadas, setCitasCompletadas] = useState<any[]>([]);
+  const [citasPendientes, setCitasPendientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Formulario para nueva consulta
   const [selectedCitaId, setSelectedCitaId] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [receta, setReceta] = useState("");
   const [saving, setSaving] = useState(false);
@@ -22,29 +24,53 @@ export default function DoctorConsultas() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from("citas")
-      .select(`
-        id, fecha, hora, estado,
-        paciente:pacientes!paciente_id(id, usuarios(id, nombre, apellidos)),
-        consultorio:consultorios(nombre),
-        consultas(id, motivo, receta, fecha_hora)
-      `)
-      .eq("doctor_id", user.id)
-      .eq("estado", "completada")
-      .order("fecha", { ascending: false })
-      .limit(20);
+    const [completadasRes, pendientesRes] = await Promise.all([
+      supabase
+        .from("citas")
+        .select(`
+          id, fecha, hora, estado,
+          paciente:pacientes!paciente_id(id, usuarios(id, nombre, apellidos)),
+          consultorio:consultorios(nombre),
+          consultas(id, motivo, receta, fecha_hora)
+        `)
+        .eq("doctor_id", user.id)
+        .eq("estado", "completada")
+        .order("fecha", { ascending: false })
+        .limit(20),
+      supabase
+        .from("citas")
+        .select(`
+          id, fecha, hora, estado,
+          paciente:pacientes!paciente_id(id, usuarios(id, nombre, apellidos)),
+          consultorio:consultorios(nombre)
+        `)
+        .eq("doctor_id", user.id)
+        .in("estado", ["pendiente", "confirmada"])
+        .order("fecha", { ascending: true })
+        .order("hora", { ascending: true })
+    ]);
 
-    if (!error) setCitasCompletadas(data || []);
+    if (!completadasRes.error) setCitasCompletadas(completadasRes.data || []);
+    if (!pendientesRes.error) setCitasPendientes(pendientesRes.data || []);
     setLoading(false);
   }, [supabase]);
 
-  useEffect(() => { fetchCitas(); }, [fetchCitas]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlCitaId = searchParams.get("cita_id");
+      if (urlCitaId) {
+        setSelectedCitaId(Number(urlCitaId));
+        setIsLocked(true);
+      }
+    }
+    fetchCitas();
+  }, [fetchCitas]);
 
   const handleGuardarConsulta = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCitaId || !motivo.trim()) {
-      setErrorMsg("Selecciona una cita e ingresa el motivo de la consulta.");
+    if (!selectedCitaId || !motivo.trim() || !receta.trim()) {
+      setErrorMsg("Debes llenar el motivo y la receta/indicaciones para completar la consulta.");
       return;
     }
 
@@ -54,7 +80,7 @@ export default function DoctorConsultas() {
 
     try {
       // 1. Obtener expediente del paciente desde la cita
-      const cita = citasCompletadas.find((c) => c.id === selectedCitaId);
+      const cita = citasPendientes.find((c) => c.id === selectedCitaId);
       if (!cita) throw new Error("Cita no encontrada.");
 
       const pacienteId = cita.paciente?.id;
@@ -90,10 +116,22 @@ export default function DoctorConsultas() {
 
       if (insertError) throw insertError;
 
+      // 4. Actualizar el estado de la cita a 'completada'
+      const { error: updateError } = await supabase
+        .from("citas")
+        .update({ estado: "completada" })
+        .eq("id", selectedCitaId);
+
+      if (updateError) console.error("No se pudo marcar la cita como completada:", updateError);
+
       setSuccessMsg("✓ Consulta registrada exitosamente en el expediente del paciente.");
       setMotivo("");
       setReceta("");
       setSelectedCitaId(null);
+      setIsLocked(false);
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
       fetchCitas();
     } catch (err: any) {
       setErrorMsg(err.message || "Ocurrió un error al guardar la consulta.");
@@ -140,22 +178,33 @@ export default function DoctorConsultas() {
                 {/* Selector de cita */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest ml-1">
-                    Cita (Completada)
+                    {isLocked ? "Atendiendo a Paciente" : "Cita (Por Atender)"}
                   </label>
-                  <select
-                    className="w-full px-4 py-3.5 rounded-2xl text-white bg-cyan-950/80 outline-none border border-white/10"
-                    value={selectedCitaId || ""}
-                    onChange={(e) => setSelectedCitaId(Number(e.target.value))}
-                    required
-                  >
-                    <option value="" disabled>Seleccionar cita...</option>
-                    {citasCompletadas.map((c: any) => (
-                      <option key={c.id} value={c.id} className="bg-cyan-950 text-white">
-                        {c.fecha} {c.hora?.slice(0, 5)} — {c.paciente?.usuarios ? `${c.paciente.usuarios.nombre} ${c.paciente.usuarios.apellidos}` : "Paciente"}
-                        {c.consultas?.length > 0 ? " ✓" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  {isLocked ? (
+                    <div
+                      className="w-full px-4 py-3 rounded-2xl text-white outline-none cursor-not-allowed flex items-center bg-cyan-950 opacity-90 border border-white/20"
+                    >
+                      <span className="material-symbols-outlined mr-2 text-emerald-400 text-lg">person</span>
+                      {citasPendientes.find(c => c.id === selectedCitaId)?.paciente?.usuarios 
+                        ? `${citasPendientes.find(c => c.id === selectedCitaId)?.paciente?.usuarios?.nombre} ${citasPendientes.find(c => c.id === selectedCitaId)?.paciente?.usuarios?.apellidos}` 
+                        : "Cargando paciente..."}
+                    </div>
+                  ) : (
+                    <select
+                      className="w-full px-4 py-3 rounded-2xl text-white outline-none cursor-pointer appearance-none"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                      value={selectedCitaId || ""}
+                      onChange={(e) => setSelectedCitaId(Number(e.target.value))}
+                      required
+                    >
+                      <option value="" disabled>Seleccionar cita...</option>
+                      {citasPendientes.map((c: any) => (
+                        <option key={c.id} value={c.id} className="bg-cyan-950 text-white">
+                          {c.fecha} {c.hora?.slice(0, 5)} — {c.paciente?.usuarios ? `${c.paciente.usuarios.nombre} ${c.paciente.usuarios.apellidos}` : "Paciente"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {/* Motivo */}
@@ -176,13 +225,14 @@ export default function DoctorConsultas() {
                 {/* Receta */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest ml-1">
-                    Receta / Indicaciones
+                    Receta / Indicaciones *
                   </label>
                   <textarea
                     className="w-full px-4 py-3.5 rounded-2xl text-white placeholder-slate-500 outline-none min-h-[120px] resize-none"
                     placeholder="Amoxicilina 500mg cada 8h por 7 días. Ibuprofeno 400mg en caso de dolor..."
                     value={receta}
                     onChange={(e) => setReceta(e.target.value)}
+                    required
                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
                   />
                 </div>

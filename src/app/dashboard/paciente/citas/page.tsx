@@ -7,7 +7,6 @@ import { createClient } from "@/utils/supabase/client";
 export default function MisCitasList() {
   const supabase = createClient();
   const [citas, setCitas] = useState<any[]>([]);
-  const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [vista, setVista] = useState<"proximas" | "historial">("proximas");
   const [successMsg, setSuccessMsg] = useState("");
@@ -19,28 +18,19 @@ export default function MisCitasList() {
 
     const hoy = new Date().toISOString().split("T")[0];
 
-    const [citasRes, notifsRes] = await Promise.all([
-      supabase
-        .from("citas")
-        .select(`
-          id, fecha, hora, estado,
-          doctor:doctores!doctor_id(usuarios(nombre, apellidos), especialidades(nombre)),
-          consultorio:consultorios(nombre, sucursales(nombre)),
-          pagos(folio, monto_total, estatus),
-          cancelaciones(motivo, reembolsos(estatus))
-        `)
-        .eq("paciente_id", user.id)
-        .order("fecha", { ascending: vista === "proximas" }),
-        supabase
-        .from("notificaciones")
-        .select("*")
-        .eq("paciente_id", user.id)
-        .eq("leida", false)
-        .order("fecha", { ascending: false })
-        .limit(5),
-    ]);
+    const { data: citasData, error } = await supabase
+      .from("citas")
+      .select(`
+        id, fecha, hora, estado,
+        doctor:doctores!doctor_id(usuarios(nombre, apellidos), especialidades(nombre)),
+        consultorio:consultorios(nombre, sucursales(nombre)),
+        pagos(folio, monto_total, estatus),
+        cancelaciones(motivo, reembolsos(estatus))
+      `)
+      .eq("paciente_id", user.id)
+      .order("fecha", { ascending: vista === "proximas" });
 
-    let data = citasRes.data || [];
+    let data = citasData || [];
     if (vista === "proximas") {
       data = data.filter((c: any) => c.fecha >= hoy && ["pendiente", "confirmada"].includes(c.estado));
     } else {
@@ -48,7 +38,6 @@ export default function MisCitasList() {
     }
 
     setCitas(data);
-    setNotificaciones(notifsRes.data || []);
     setLoading(false);
   }, [supabase, vista]);
 
@@ -59,17 +48,10 @@ export default function MisCitasList() {
     const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
     if (error) alert("Error: " + error.message);
     else {
-      setSuccessMsg("Cita cancelada. Recibirás una notificación de confirmación.");
+      setSuccessMsg("Cita cancelada. Revisa tus notificaciones en la campana superior.");
       setTimeout(() => setSuccessMsg(""), 4000);
       fetchData();
     }
-  };
-
-  const marcarLeidas = async () => {
-    const ids = notificaciones.map((n: any) => n.id);
-    if (ids.length === 0) return;
-    await supabase.from("notificaciones").update({ leida: true }).in("id", ids);
-    setNotificaciones([]);
   };
 
   const estadoBadge = (estado: string) => {
@@ -84,30 +66,8 @@ export default function MisCitasList() {
   };
 
   return (
-    <main className="relative z-10 px-6 pb-32 max-w-4xl mx-auto w-full" style={{ paddingTop: "1.5rem" }}>
+    <main className="relative z-10 px-6 pt-28 pb-32 max-w-4xl mx-auto w-full">
       
-      {/* Notificaciones no leídas */}
-      {notificaciones.length > 0 && (
-        <div className="mb-6 bg-cyan-500/10 border border-cyan-500/30 rounded-[1.5rem] p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-cyan-400 text-sm">notifications</span>
-              <span className="text-xs font-bold text-cyan-300 uppercase tracking-widest">Notificaciones nuevas</span>
-            </div>
-            <button type="button" onClick={marcarLeidas} className="text-xs text-white/40 hover:text-white transition-colors">
-              Marcar todas como leídas
-            </button>
-          </div>
-          <div className="space-y-2">
-            {notificaciones.map((n: any) => (
-              <p key={n.id} className="text-sm text-white/70 bg-white/5 rounded-xl px-3 py-2">
-                {n.mensaje}
-              </p>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-3xl font-extrabold text-white font-headline tracking-tight">Mis Citas</h2>
