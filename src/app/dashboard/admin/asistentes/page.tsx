@@ -334,9 +334,6 @@ export default function AdminRegistroAsistentes() {
                           <span className="material-symbols-outlined text-xs">store</span> {asis.sucursal_nombre}
                         </p>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs">badge</span> {asis.usuario}
-                          </span>
                           {asis.telefono && (
                             <span className="flex items-center gap-1">
                               <span className="material-symbols-outlined text-xs">call</span> {asis.telefono}

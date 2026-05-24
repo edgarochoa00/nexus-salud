@@ -155,6 +155,18 @@ export default function AdminAsignaciones() {
       const tInicio = horaInicio.length === 5 ? `${horaInicio}:00` : horaInicio;
       const tFin = horaFin.length === 5 ? `${horaFin}:00` : horaFin;
 
+      // Validar regla de negocio: Un doctor solo puede tener un único consultorio asignado
+      const doctorAssignments = assignmentsList.filter(a => a.doctor_id === doctorId);
+      if (doctorAssignments.length > 0) {
+        const assignedConsultorio = doctorAssignments[0].consultorio_id;
+        if (assignedConsultorio !== Number(consultorioId)) {
+          const conConflicto = doctorAssignments[0].consultorios?.nombre || "otro consultorio";
+          setErrorMsg(`Regla estricta: Este médico ya fue asignado al ${conConflicto}. Un médico solo puede pertenecer a un único consultorio en el sistema.`);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Validate all selected days
       for (const dia of diasSemana) {
         const choqueConsultorio = assignmentsList.find((asig) => {
@@ -413,15 +425,22 @@ export default function AdminAsignaciones() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 max-h-[680px] overflow-y-auto pr-2">
-                {assignmentsList.map((asig) => {
-                  // Aplanar nombres para el despliegue
-                  const docUser = asig.doctores?.usuarios || {};
+                {assignmentsList.reduce((acc: any[], asig: any) => {
+                  const existing = acc.find(a => a.doctor_id === asig.doctor_id && a.consultorio_id === asig.consultorio_id && a.hora_inicio === asig.hora_inicio && a.hora_fin === asig.hora_fin);
+                  if (existing) {
+                    if (!existing.dias.includes(asig.dia_semana)) existing.dias.push(asig.dia_semana);
+                    existing.ids.push(asig.id);
+                  } else {
+                    acc.push({ ...asig, dias: [asig.dia_semana], ids: [asig.id] });
+                  }
+                  return acc;
+                }, []).map((asigGroup) => {
+                  const docUser = asigGroup.doctores?.usuarios || {};
                   const doctorName = docUser.nombre ? `Dr. ${docUser.nombre} ${docUser.apellidos}` : "Médico Desconocido";
-                  const specialty = asig.doctores?.especialidades?.nombre || "Sin Especialidad";
-                  const conName = asig.consultorios?.nombre || "Consultorio Desconocido";
-                  const branchName = asig.consultorios?.sucursales?.nombre || "Sin Sucursal";
+                  const specialty = asigGroup.doctores?.especialidades?.nombre || "Sin Especialidad";
+                  const conName = asigGroup.consultorios?.nombre || "Consultorio Desconocido";
+                  const branchName = asigGroup.consultorios?.sucursales?.nombre || "Sin Sucursal";
 
-                  // Formatear horas para visualización más amigable (quitar segundos extras si existen)
                   const formatTime = (t: string) => {
                     if (!t) return "";
                     const parts = t.split(":");
@@ -431,7 +450,7 @@ export default function AdminAsignaciones() {
 
                   return (
                     <div
-                      key={asig.id}
+                      key={asigGroup.ids.join("-")}
                       className="rounded-[1.5rem] p-5 flex items-center justify-between transition-all hover:bg-white/5 border border-white/10 bg-white/5"
                       style={{ backdropFilter: "blur(20px)" }}
                     >
@@ -450,19 +469,35 @@ export default function AdminAsignaciones() {
                             <span className="flex items-center gap-1">
                               <span className="material-symbols-outlined text-xs">meeting_room</span> {conName} ({branchName})
                             </span>
-                            <span className="flex items-center gap-1 font-bold text-cyan-300">
-                              <span className="material-symbols-outlined text-xs">event</span> {capitalize(asig.dia_semana)}
-                            </span>
                             <span className="flex items-center gap-1 text-emerald-400">
-                              <span className="material-symbols-outlined text-xs">alarm</span> {formatTime(asig.hora_inicio)} - {formatTime(asig.hora_fin)}
+                              <span className="material-symbols-outlined text-xs">alarm</span> {formatTime(asigGroup.hora_inicio)} - {formatTime(asigGroup.hora_fin)}
                             </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {asigGroup.dias.map((d: string) => (
+                              <span key={d} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-md text-[10px] text-cyan-300 font-bold capitalize">
+                                {d}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => handleDelete(asig.id, doctorName, conName, capitalize(asig.dia_semana))}
+                        onClick={async () => {
+                          const confirm = window.confirm(`¿Estás seguro de que deseas retirar la asignación de ${doctorName} en el "${conName}" los días ${asigGroup.dias.join(", ")}?`);
+                          if (!confirm) return;
+                          
+                          try {
+                            const { error } = await supabase.from("doctor_consultorios").delete().in("id", asigGroup.ids);
+                            if (error) throw error;
+                            loadData();
+                          } catch (err: any) {
+                            console.error(err);
+                            alert("No se pudo retirar la asignación.");
+                          }
+                        }}
                         className="w-10 h-10 rounded-full flex items-center justify-center border border-red-500/20 text-red-400 bg-red-950/20 hover:bg-red-500 hover:text-white transition-all active:scale-95 duration-200"
                       >
                         <span className="material-symbols-outlined text-lg">delete</span>

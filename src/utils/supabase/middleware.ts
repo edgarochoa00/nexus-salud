@@ -23,6 +23,9 @@ export async function updateSession(request: NextRequest) {
         )
       },
     },
+    cookieOptions: {
+      secure: false,
+    },
   })
 
   // Refrescar la sesión del usuario

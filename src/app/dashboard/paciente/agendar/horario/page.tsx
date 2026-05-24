@@ -105,16 +105,18 @@ export default function HorarioSelection() {
       const dd = String(selectedDate.getDate()).padStart(2, "0");
       const fechaStr = `${yyyy}-${mm}-${dd}`;
 
-      const supabase = createClient();
-      supabase
-        .rpc("obtener_horarios_ocupados", {
-          p_doctor_id: cita.doctor_id,
-          p_fecha: fechaStr
-        })
-        .then(({ data }) => {
-          if (data) {
-            setBookedTimes(data.map((d: any) => d.hora.slice(0, 5)));
+      fetch(`/api/paciente/agendar/horarios_ocupados?doctorId=${cita.doctor_id}&fecha=${fechaStr}`, {
+        cache: 'no-store'
+      })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success && result.horarios) {
+            setBookedTimes(result.horarios.map((d: any) => d.hora.slice(0, 5)));
           }
+          setLoadingHours(false);
+        })
+        .catch(err => {
+          console.error(err);
           setLoadingHours(false);
         });
     } else {

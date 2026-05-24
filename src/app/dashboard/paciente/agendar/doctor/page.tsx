@@ -47,10 +47,16 @@ export default function DoctorSelection() {
       });
   }, []);
 
-  // Deduplicate doctors, keeping their best/first slot
+  // Deduplicate doctors by doctor AND consultorio, accumulating their available days
   const uniqueDoctors = turnosByDoctor.reduce((acc: any[], turno: any) => {
-    const exists = acc.find((d) => d.doctor_id === turno.doctor_id);
-    if (!exists) acc.push(turno);
+    const exists = acc.find((d) => d.doctor_id === turno.doctor_id && d.consultorio_id === turno.consultorio_id);
+    if (!exists) {
+      acc.push({ ...turno, dias_disponibles: [turno.dia_semana] });
+    } else {
+      if (!exists.dias_disponibles.includes(turno.dia_semana)) {
+        exists.dias_disponibles.push(turno.dia_semana);
+      }
+    }
     return acc;
   }, []);
 
@@ -152,6 +158,16 @@ export default function DoctorSelection() {
                         </h3>
                         <p className="text-cyan-400 font-medium text-sm">{esp}</p>
                         {suc && <p className="text-white/40 text-xs mt-0.5">{suc.nombre}</p>}
+                        
+                        {turno.dias_disponibles && turno.dias_disponibles.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {turno.dias_disponibles.map((dia: string) => (
+                              <span key={dia} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-md text-[10px] text-white/60 capitalize">
+                                {dia}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-white/50 uppercase tracking-tighter">Consulta</p>

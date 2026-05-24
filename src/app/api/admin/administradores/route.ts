@@ -9,7 +9,7 @@ export async function GET() {
     // Consultar usuarios con rol 'admin'
     const { data, error } = await supabaseAdmin
       .from("usuarios")
-      .select("id, nombre, apellidos, telefono, correo, usuario, rol, created_at")
+      .select("id, nombre, apellidos, telefono, correo, rol, created_at")
       .eq("rol", "admin")
       .order("created_at", { ascending: false });
 

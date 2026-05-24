@@ -38,7 +38,7 @@ export default function ExpedienteMedico() {
             citas(
               fecha,
               hora,
-              doctor:usuarios!doctor_id(nombre, apellidos, doctores(especialidades(nombre))),
+              doctor:doctores!doctor_id(usuarios(nombre, apellidos), especialidades(nombre)),
               consultorio:consultorios(nombre, sucursales(nombre))
             )
           )
@@ -169,10 +169,9 @@ export default function ExpedienteMedico() {
           <div className="space-y-3">
             {consultas.map((consulta: any) => {
               const cita = consulta.citas;
-              const doc = cita?.doctor;
+              const doc = cita?.doctor?.usuarios;
               const con = cita?.consultorio;
-              const espInfo = doc?.doctores?.[0]?.especialidades || doc?.doctores?.especialidades;
-              const especialidad = espInfo?.nombre;
+              const especialidad = cita?.doctor?.especialidades?.nombre;
               const isExpanded = expandedId === consulta.id;
 
               return (

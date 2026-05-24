@@ -15,7 +15,6 @@ export async function GET() {
         apellidos,
         telefono,
         correo,
-        usuario,
         rol,
         created_at,
         secretarias (
@@ -44,7 +43,6 @@ export async function GET() {
         apellidos: user.apellidos,
         telefono: user.telefono,
         correo: user.correo,
-        usuario: user.usuario,
         rol: user.rol,
         created_at: user.created_at,
         sucursal_id: secInfo.sucursal_id || null,

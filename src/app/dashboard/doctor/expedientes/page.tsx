@@ -16,36 +16,17 @@ export default function DoctorExpedientes() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Cargar expedientes de pacientes que han tenido citas con este doctor
-    const { data, error } = await supabase
-      .from("citas")
-      .select(`
-        paciente_id,
-        paciente:pacientes!paciente_id(
-          id,
-          fecha_nacimiento,
-          usuarios(
-            id,
-            nombre,
-            apellidos,
-            telefono,
-            correo
-          ),
-          expedientes(
-            id,
-            consultas(id, fecha_hora, motivo, receta)
-          )
-        )
-      `)
-      .eq("doctor_id", user.id)
-      .eq("estado", "completada")
-      .order("created_at", { ascending: false });
+    // Cargar expedientes de pacientes que han tenido citas con este doctor (usando admin client para saltar RLS en citas de otros doctores)
+    const res = await fetch(`/api/doctor/expedientes?doctorId=${user.id}`);
+    const result = await res.json();
 
-    if (error) {
-      console.error("Error al cargar expedientes:", error);
+    if (!result.success) {
+      console.error("Error al cargar expedientes:", result.error);
       setLoading(false);
       return;
     }
+
+    const data = result.expedientes;
 
     // Deduplicar por paciente_id y mapear a la estructura que espera la vista
     const seen = new Set<string>();
@@ -208,9 +189,17 @@ export default function DoctorExpedientes() {
                       ) : (
                         Array.isArray(consultas) && consultas.map((c: any) => (
                           <div key={c.id} className="bg-white/5 rounded-xl p-4 space-y-2">
-                            <p className="text-[10px] font-bold text-[#00a3ad] uppercase tracking-widest">
-                              {formatFecha(c.fecha_hora)}
-                            </p>
+                            <div className="flex justify-between items-start">
+                              <p className="text-[10px] font-bold text-[#00a3ad] uppercase tracking-widest">
+                                {formatFecha(c.fecha_hora)}
+                              </p>
+                              {c.citas?.doctor?.usuarios && (
+                                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px]">stethoscope</span>
+                                  Dr. {c.citas.doctor.usuarios.nombre} {c.citas.doctor.usuarios.apellidos}
+                                </p>
+                              )}
+                            </div>
                             {c.motivo && (
                               <p className="text-sm text-white/80"><span className="font-bold text-white/50">Motivo:</span> {c.motivo}</p>
                             )}

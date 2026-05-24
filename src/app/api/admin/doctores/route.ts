@@ -15,7 +15,6 @@ export async function GET() {
         apellidos,
         telefono,
         correo,
-        usuario,
         rol,
         created_at,
         doctores (
@@ -45,7 +44,6 @@ export async function GET() {
         apellidos: user.apellidos,
         telefono: user.telefono,
         correo: user.correo,
-        usuario: user.usuario,
         rol: user.rol,
         created_at: user.created_at,
         precio_consulta: docInfo.precio_consulta || 0,
