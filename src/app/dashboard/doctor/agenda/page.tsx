@@ -38,7 +38,8 @@ export default function DoctorAgenda() {
   useEffect(() => { fetchAgenda(); }, [fetchAgenda]);
 
   const handleCancelCita = async (id: number) => {
-    if (!window.confirm("¿Cancelar esta cita? El paciente recibirá una notificación automática.")) return;
+    const motivoDoctor = window.prompt("¿Por qué necesitas cancelar esta cita? El paciente recibirá este motivo junto con su reembolso al 100%.");
+    if (!motivoDoctor) return;
     
     // 1. Cancelar cita
     const { error } = await supabase.from("citas").update({ estado: "cancelada" }).eq("id", id);
@@ -50,7 +51,7 @@ export default function DoctorAgenda() {
           .from("cancelaciones")
           .insert({
             cita_id: id,
-            motivo: "Cancelada por el Doctor (Reembolso aplicable)",
+            motivo: `Cancelada por el doctor: ${motivoDoctor}`,
             tipo: "medico",
             cancelado_por: "doctor"
           })
@@ -61,22 +62,32 @@ export default function DoctorAgenda() {
           console.error("Error al registrar la cancelación:", cancelacionError);
         }
 
-        // 3. Obtener el pago asociado y generar reembolso
-        const { data: pagosData } = await supabase
-          .from("pagos")
-          .select("monto_total")
-          .eq("cita_id", id);
+        // 3. Obtener el pago y el paciente asociados
+        const { data: citaAnulada } = await supabase
+          .from("citas")
+          .select("paciente_id, fecha, hora, pagos(monto_total, anticipo)")
+          .eq("id", id)
+          .single();
 
-        const pagoInfo = pagosData?.[0];
-        if (cancelacionData && pagoInfo) {
-          const montoReembolso = pagoInfo.monto_total || 0;
-          if (montoReembolso > 0) {
+        if (citaAnulada) {
+          const pagoInfo = citaAnulada.pagos?.[0];
+          const montoReembolso = pagoInfo?.monto_total || pagoInfo?.anticipo || 0;
+          
+          if (cancelacionData && montoReembolso > 0) {
             await supabase.from("reembolsos").insert({
               cancelacion_id: cancelacionData.id,
               monto: montoReembolso,
               estatus: "pendiente"
             });
           }
+
+          // 4. Notificar al paciente
+          await supabase.from("notificaciones").insert({
+            mensaje: `El doctor canceló tu cita del ${citaAnulada.fecha} a las ${citaAnulada.hora?.slice(0,5)}. Motivo: "${motivoDoctor}". Se ha procesado tu reembolso íntegro de $${montoReembolso} MXN.`,
+            tipo: "cancelacion",
+            paciente_id: citaAnulada.paciente_id,
+            cancelacion_id: cancelacionData?.id || null
+          });
         }
       } catch (e) {
         console.error(e);
@@ -127,7 +138,7 @@ export default function DoctorAgenda() {
 
         {/* Filtros */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
-          {(["todas", "pendiente", "confirmada", "completada"] as const).map((f) => (
+          {(["todas", "pendiente", "confirmada", "completada", "cancelada"] as const).map((f) => (
             <button
               key={f}
               type="button"

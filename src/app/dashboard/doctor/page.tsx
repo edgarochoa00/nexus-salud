@@ -189,12 +189,22 @@ export default function DoctorDashboard() {
                         </p>
                       </div>
                     </div>
-                    <Link
-                      href={`/dashboard/doctor/consultas?cita_id=${cita.id}`}
-                      className="bg-[#00a3ad] hover:bg-[#00a3ad]/90 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all active:scale-95 whitespace-nowrap"
-                    >
-                      Atender
-                    </Link>
+                    {cita.estado === "completada" ? (
+                      <Link
+                        href="/dashboard/doctor/expedientes"
+                        className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all hover:bg-emerald-500/30 active:scale-95 whitespace-nowrap flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        Atendida
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/dashboard/doctor/consultas?cita_id=${cita.id}`}
+                        className="bg-[#00a3ad] hover:bg-[#00a3ad]/90 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                      >
+                        Atender
+                      </Link>
+                    )}
                   </div>
                 );
               })}

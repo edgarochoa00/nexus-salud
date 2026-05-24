@@ -76,20 +76,53 @@ export default function ClientPage({ params }: { params: { id: string } }) {
       console.error("Error al registrar la cancelación:", cancelacionError);
     }
 
-    // 3. Si hay anticipo/monto_total y es >24h, generar reembolso
-    if (!isLessThan24h && cancelacionData) {
-      const montoReembolso = (cita.pagos?.[0]?.anticipo || cita.pagos?.[0]?.monto_total || 0);
-      if (montoReembolso > 0) {
-        try {
-          await supabase.from("reembolsos").insert({
-            cancelacion_id: cancelacionData.id,
-            monto: montoReembolso,
-            estatus: "pendiente"
-          });
-        } catch (e) {
-          console.error("Error al registrar el reembolso:", e);
-        }
+    // 3. Lógica de retención y reembolso
+    const pagoInfo = cita.pagos?.[0] || {};
+    // El paciente pudo haber pagado solo el anticipo (estatus parcial/pagado) o el monto total
+    const montoTotalPagado = pagoInfo.monto_total || pagoInfo.anticipo || 0; 
+    const anticipo = pagoInfo.anticipo || 0;
+
+    let montoReembolsar = 0;
+    let montoRetenido = 0;
+
+    if (!isLessThan24h) {
+      // Cancelación anticipada: se reembolsa todo lo que pagó
+      montoReembolsar = montoTotalPagado;
+      montoRetenido = 0;
+    } else {
+      // Cancelación tardía (<24h): la clínica penaliza reteniendo solo el anticipo
+      montoRetenido = anticipo;
+      // Si el paciente ya había pagado el total (y era mayor al anticipo), le devolvemos la diferencia
+      montoReembolsar = montoTotalPagado > anticipo ? montoTotalPagado - anticipo : 0;
+    }
+
+    if (montoReembolsar > 0 && cancelacionData) {
+      try {
+        await supabase.from("reembolsos").insert({
+          cancelacion_id: cancelacionData.id,
+          monto: montoReembolsar,
+          estatus: "pendiente"
+        });
+      } catch (e) {
+        console.error("Error al registrar el reembolso:", e);
       }
+    }
+
+    // 4. Notificar al doctor
+    try {
+      const nombrePaciente = cita.paciente?.usuarios?.nombre ? `${cita.paciente.usuarios.nombre} ${cita.paciente.usuarios.apellidos || ""}`.trim() : "Un paciente";
+      const mensajeDoctor = isLessThan24h
+        ? `${nombrePaciente} canceló su cita del ${cita.fecha} a las ${cita.hora?.slice(0,5)} con menos de 24h de anticipación. Se penalizó reteniendo el anticipo de $${montoRetenido} a tu favor.`
+        : `${nombrePaciente} canceló su cita del ${cita.fecha} a las ${cita.hora?.slice(0,5)}. Se reembolsó íntegramente al paciente.`;
+
+      await supabase.from("notificaciones").insert({
+        mensaje: mensajeDoctor,
+        tipo: "cancelacion",
+        doctor_id: cita.doctor_id,
+        cancelacion_id: cancelacionData?.id || null
+      });
+    } catch (e) {
+      console.error("Error al notificar al doctor:", e);
     }
 
     alert("Cita cancelada exitosamente.");

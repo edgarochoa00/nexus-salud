@@ -45,7 +45,9 @@ export default function PacientePerfil() {
       </div>
 
       {loading ? (
-        <div className="h-64 bg-white/5 animate-pulse rounded-[2rem] border border-white/10" />
+        <div className="h-64 bg-white/5 rounded-[2rem] border border-white/10 flex items-center justify-center">
+          <span className="material-symbols-outlined text-white/20 text-4xl animate-spin">progress_activity</span>
+        </div>
       ) : perfil ? (
         <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-primary)]/20 rounded-full blur-3xl mix-blend-screen pointer-events-none"></div>

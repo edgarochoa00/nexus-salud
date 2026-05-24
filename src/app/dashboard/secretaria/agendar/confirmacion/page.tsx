@@ -11,6 +11,9 @@ export default function ConfirmacionSecretaria() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [cita, setCita] = useState<any>(null);
+  
+  const [anticipo, setAnticipo] = useState<number>(0);
+  const [metodoPago, setMetodoPago] = useState("efectivo");
 
   const loadCita = useCallback(() => {
     const datos = obtenerCitaEnProceso();
@@ -35,20 +38,8 @@ export default function ConfirmacionSecretaria() {
 
     const datos = obtenerCitaEnProceso();
 
-    if (!datos.paciente_id) {
-      setError("Selecciona un paciente antes de confirmar la cita.");
-      setLoading(false);
-      return;
-    }
-
-    if (!datos.doctor_id) {
-      setError("No se encontró el doctor seleccionado. Por favor reinicia el proceso.");
-      setLoading(false);
-      return;
-    }
-
-    if (!datos.fecha || !datos.hora) {
-      setError("Por favor selecciona fecha y hora antes de confirmar.");
+    if (!datos.paciente_id || !datos.doctor_id || !datos.fecha || !datos.hora) {
+      setError("Faltan datos de la cita. Por favor reinicia el proceso.");
       setLoading(false);
       return;
     }
@@ -77,14 +68,16 @@ export default function ConfirmacionSecretaria() {
       return;
     }
 
-    // 2. Register payment (secretaria doesn't charge, so mark as pendiente with 0 anticipo)
+    // 2. Register payment
     const precio = datos.precio ?? 0;
+    const estatusPago = anticipo >= precio && precio > 0 ? "pagado" : (anticipo > 0 ? "parcial" : "pendiente");
+    
     const { error: pagoError } = await supabase.from("pagos").insert({
       cita_id: citaData.id,
       monto_total: precio,
-      anticipo: 0,
-      metodo_pago: "efectivo",
-      estatus: "pendiente",
+      anticipo: anticipo,
+      metodo_pago: metodoPago,
+      estatus: estatusPago,
     });
 
     if (pagoError) {
@@ -171,9 +164,41 @@ export default function ConfirmacionSecretaria() {
         <p className="text-slate-400 text-sm max-w-sm mx-auto">
           Confirma que los datos de la cita y el paciente sean correctos antes de guardarlos en el sistema.
         </p>
-        <form onSubmit={handleConfirm}>
+        <form onSubmit={handleConfirm} className="text-left mt-6 space-y-4">
+          <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+            <h3 className="text-white font-bold mb-3 text-sm">Registro de Anticipo</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Monto Cobrado (MXN)</label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  step="1" 
+                  value={anticipo}
+                  onChange={(e) => setAnticipo(Number(e.target.value))}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-teal-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Método de Pago</label>
+                <select 
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-teal-500 appearance-none"
+                >
+                  <option value="efectivo" className="bg-[#021526]">Efectivo</option>
+                  <option value="tarjeta" className="bg-[#021526]">Tarjeta</option>
+                </select>
+              </div>
+            </div>
+            {cita.precio > 0 && (
+              <p className="text-xs text-slate-400 mt-2 text-right">Costo total de la consulta: ${cita.precio} MXN</p>
+            )}
+          </div>
+
           <button type="submit" disabled={loading}
-            className="w-full h-16 mt-6 rounded-full bg-[var(--color-primary-container)] text-white font-headline font-bold text-lg shadow-[0_0_15px_rgba(0,163,173,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-60">
+            className="w-full h-16 rounded-full bg-[var(--color-primary-container)] text-white font-headline font-bold text-lg shadow-[0_0_15px_rgba(0,163,173,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-60">
             <span>{loading ? "Guardando en sistema..." : "Confirmar en Sistema"}</span>
             <span className="material-symbols-outlined">{loading ? "hourglass_empty" : "check_circle"}</span>
           </button>

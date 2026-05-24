@@ -67,6 +67,17 @@ export default function DoctorConsultas() {
     fetchCitas();
   }, [fetchCitas]);
 
+  // Si la cita seleccionada ya está completada, poblar los campos con los datos existentes
+  useEffect(() => {
+    if (selectedCitaId && citasCompletadas.length > 0) {
+      const cita = citasCompletadas.find(c => c.id === selectedCitaId);
+      if (cita && cita.consultas && cita.consultas.length > 0) {
+        setMotivo(cita.consultas[0].motivo || "");
+        setReceta(cita.consultas[0].receta || "");
+      }
+    }
+  }, [selectedCitaId, citasCompletadas]);
+
   const handleGuardarConsulta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCitaId || !motivo.trim() || !receta.trim()) {
@@ -178,16 +189,25 @@ export default function DoctorConsultas() {
                 {/* Selector de cita */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest ml-1">
-                    {isLocked ? "Atendiendo a Paciente" : "Cita (Por Atender)"}
+                    {isLocked || citasCompletadas.some(c => c.id === selectedCitaId) ? "Paciente Seleccionado" : "Cita (Por Atender)"}
                   </label>
-                  {isLocked ? (
+                  {isLocked || citasCompletadas.some(c => c.id === selectedCitaId) ? (
                     <div
-                      className="w-full px-4 py-3 rounded-2xl text-white outline-none cursor-not-allowed flex items-center bg-cyan-950 opacity-90 border border-white/20"
+                      className="w-full px-4 py-3 rounded-2xl text-white outline-none flex items-center bg-cyan-950 opacity-90 border border-white/20 relative"
                     >
                       <span className="material-symbols-outlined mr-2 text-emerald-400 text-lg">person</span>
-                      {citasPendientes.find(c => c.id === selectedCitaId)?.paciente?.usuarios 
-                        ? `${citasPendientes.find(c => c.id === selectedCitaId)?.paciente?.usuarios?.nombre} ${citasPendientes.find(c => c.id === selectedCitaId)?.paciente?.usuarios?.apellidos}` 
-                        : "Cargando paciente..."}
+                      <span className="flex-1 truncate">
+                        {[...citasPendientes, ...citasCompletadas].find(c => c.id === selectedCitaId)?.paciente?.usuarios 
+                          ? `${[...citasPendientes, ...citasCompletadas].find(c => c.id === selectedCitaId)?.paciente?.usuarios?.nombre} ${[...citasPendientes, ...citasCompletadas].find(c => c.id === selectedCitaId)?.paciente?.usuarios?.apellidos}` 
+                          : "Cargando paciente..."}
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={() => { setSelectedCitaId(null); setIsLocked(false); setMotivo(""); setReceta(""); }}
+                        className="material-symbols-outlined text-white/50 hover:text-white transition-colors absolute right-4"
+                      >
+                        close
+                      </button>
                     </div>
                   ) : (
                     <select
@@ -237,15 +257,23 @@ export default function DoctorConsultas() {
                   />
                 </div>
 
+                {/* Botón de Guardar */}
                 <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full bg-emerald-600 disabled:bg-slate-700 text-white font-headline font-extrabold py-4 rounded-2xl shadow-[0_10px_30px_rgba(5,150,105,0.3)] hover:bg-emerald-500 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                  >
-                    <span className="material-symbols-outlined">{saving ? "hourglass_empty" : "save"}</span>
-                    {saving ? "Guardando..." : "Guardar en Expediente"}
-                  </button>
+                  {citasCompletadas.some(c => c.id === selectedCitaId) ? (
+                    <div className="w-full bg-emerald-500/20 text-emerald-300 font-headline font-bold py-4 rounded-2xl flex items-center justify-center gap-3 border border-emerald-500/30">
+                      <span className="material-symbols-outlined">check_circle</span>
+                      Esta consulta ya fue completada y guardada.
+                    </div>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={saving || !selectedCitaId}
+                      className="w-full bg-emerald-600 disabled:bg-slate-700 disabled:opacity-50 text-white font-headline font-extrabold py-4 rounded-2xl shadow-[0_10px_30px_rgba(5,150,105,0.3)] hover:bg-emerald-500 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                    >
+                      <span className="material-symbols-outlined">{saving ? "hourglass_empty" : "save"}</span>
+                      {saving ? "Guardando..." : "Guardar en Expediente"}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
@@ -256,7 +284,9 @@ export default function DoctorConsultas() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold font-headline text-white">Citas Completadas</h2>
-                <p className="text-slate-400 text-sm">Últimas {citasCompletadas.length} consultas</p>
+                <p className="text-slate-400 text-sm">
+                  {selectedCitaId ? "Historial clínico del paciente" : "Historial general"}
+                </p>
               </div>
               <button type="button" onClick={fetchCitas} className="text-[#00a3ad] p-2 rounded-full hover:bg-white/5 border border-white/5 active:scale-95 transition-all">
                 <span className="material-symbols-outlined">refresh</span>
@@ -267,21 +297,35 @@ export default function DoctorConsultas() {
               <div className="space-y-3">
                 {[1, 2, 3].map((n) => <div key={n} className="h-20 bg-white/5 animate-pulse rounded-[1.5rem]" />)}
               </div>
-            ) : citasCompletadas.length === 0 ? (
-              <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[1.5rem]">
-                <span className="material-symbols-outlined text-4xl text-white/20">stethoscope</span>
-                <p className="text-white/40 text-sm mt-2">No hay citas completadas aún.</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                {citasCompletadas.map((cita: any) => {
-                  const tieneConsulta = cita.consultas?.length > 0;
-                  const consulta = cita.consultas?.[0];
-                  return (
-                    <div
-                      key={cita.id}
-                      className={`p-4 rounded-[1.5rem] border transition-all cursor-pointer ${
-                        selectedCitaId === cita.id
+            ) : (() => {
+              const filtradas = citasCompletadas.filter((cita: any) => {
+                if (!selectedCitaId) return true;
+                const citaActual = [...citasPendientes, ...citasCompletadas].find(c => c.id === selectedCitaId);
+                if (!citaActual || !citaActual.paciente) return true;
+                return cita.paciente?.id === citaActual.paciente.id;
+              });
+              
+              if (filtradas.length === 0) {
+                return (
+                  <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[1.5rem]">
+                    <span className="material-symbols-outlined text-4xl text-white/20">stethoscope</span>
+                    <p className="text-white/40 text-sm mt-2">
+                      {selectedCitaId ? "Este paciente no tiene historial de citas pasadas." : "No hay citas completadas aún."}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {filtradas.map((cita: any) => {
+                    const tieneConsulta = cita.consultas?.length > 0;
+                    const consulta = cita.consultas?.[0];
+                    return (
+                      <div
+                        key={cita.id}
+                        className={`p-4 rounded-[1.5rem] border transition-all cursor-pointer ${
+                          selectedCitaId === cita.id
                           ? "bg-emerald-500/10 border-emerald-500/40"
                           : "bg-white/5 border-white/10 hover:bg-white/8"
                       }`}
@@ -316,7 +360,8 @@ export default function DoctorConsultas() {
                   );
                 })}
               </div>
-            )}
+            );
+          })()}
           </div>
         </div>
       </main>

@@ -167,9 +167,8 @@ export default function DoctorExpedientes() {
                           {pac ? `${pac.nombre} ${pac.apellidos}` : "Paciente"}
                         </h3>
                         <div className="flex items-center gap-3 text-xs text-white/40 mt-0.5">
-                          <span>{calcEdad(fechaNac)}</span>
-                          {pac?.telefono && <span>· {pac.telefono}</span>}
-                          <span>· {Array.isArray(consultas) ? consultas.length : 0} consulta{Array.isArray(consultas) && consultas.length !== 1 ? "s" : ""}</span>
+                          {pac?.telefono && <span>{pac.telefono}</span>}
+                          <span>{pac?.telefono ? "· " : ""}{Array.isArray(consultas) ? consultas.length : 0} consulta{Array.isArray(consultas) && consultas.length !== 1 ? "s" : ""}</span>
                         </div>
                       </div>
                     </div>

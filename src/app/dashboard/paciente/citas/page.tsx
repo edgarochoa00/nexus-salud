@@ -170,16 +170,23 @@ export default function MisCitasList() {
                     
                     {/* Sección de Reembolsos / Cancelaciones */}
                     {cita.estado === "cancelada" && (
-                      <div className="mt-2 flex flex-col gap-1">
-                        {cita.cancelaciones?.[0]?.reembolsos && cita.cancelaciones[0].reembolsos.length > 0 && (
-                          <span className="inline-block text-[10px] font-bold px-2 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md">
-                            Reembolso: {cita.cancelaciones[0].reembolsos[0].estatus}
-                          </span>
+                      <div className="mt-2 flex flex-col gap-2 max-w-md">
+                        {cita.cancelaciones?.[0]?.motivo && (
+                          <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 leading-relaxed">
+                            <strong className="block text-[10px] uppercase tracking-wider text-red-400 mb-0.5">Motivo:</strong>
+                            {cita.cancelaciones[0].motivo}
+                          </p>
                         )}
-                        {cita.cancelaciones && cita.cancelaciones.length > 0 && (
-                          <span className="inline-block text-[10px] font-bold px-2 py-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded-md">
-                            Penalización: Sin Reembolso (&lt; 24h)
+                        {cita.cancelaciones?.[0]?.reembolsos && cita.cancelaciones[0].reembolsos.length > 0 ? (
+                          <span className="self-start inline-block text-[10px] font-bold px-2 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md">
+                            Aplica Reembolso
                           </span>
+                        ) : (
+                          cita.cancelaciones && cita.cancelaciones.length > 0 && (
+                            <span className="self-start inline-block text-[10px] font-bold px-2 py-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded-md">
+                              Penalización: Sin Reembolso (&lt; 24h)
+                            </span>
+                          )
                         )}
                       </div>
                     )}

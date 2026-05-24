@@ -12,6 +12,7 @@ export function DoctorBottomNav() {
     { name: "Consultas", href: "/dashboard/doctor/consultas", icon: "medical_services" },
     { name: "Expedientes", href: "/dashboard/doctor/expedientes", icon: "folder_shared" },
     { name: "Agenda", href: "/dashboard/doctor/agenda", icon: "calendar_month" },
+    { name: "Pagos", href: "/dashboard/doctor/pagos", icon: "payments" },
   ];
 
   return (

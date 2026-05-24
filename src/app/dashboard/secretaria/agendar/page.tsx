@@ -34,12 +34,14 @@ export default function SecretariaEspecialidadSelection() {
   const buscarPacientes = async () => {
     if (!pacienteBusqueda.trim()) return;
     setBuscando(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("usuarios")
-      .select("id, nombre, apellidos, correo, usuario")
+      .select("id, nombre, apellidos, correo, curp")
       .eq("rol", "paciente")
-      .or(`nombre.ilike.%${pacienteBusqueda}%,apellidos.ilike.%${pacienteBusqueda}%,usuario.ilike.%${pacienteBusqueda}%`)
+      .or(`nombre.ilike.%${pacienteBusqueda}%,apellidos.ilike.%${pacienteBusqueda}%,correo.ilike.%${pacienteBusqueda}%,curp.ilike.%${pacienteBusqueda}%`)
       .limit(5);
+    
+    if (error) console.error("Search error:", error);
     setPacientes(data ?? []);
     setBuscando(false);
   };
@@ -87,7 +89,7 @@ export default function SecretariaEspecialidadSelection() {
             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/40">search</span>
             <input
               type="text"
-              placeholder="Buscar paciente por nombre o ID..."
+              placeholder="Buscar paciente por nombre, correo o CURP..."
               value={pacienteBusqueda}
               onChange={(e) => setPacienteBusqueda(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarPacientes()}
@@ -114,7 +116,7 @@ export default function SecretariaEspecialidadSelection() {
                 className="w-full text-left px-4 py-3 hover:bg-white/10 transition-all border-b border-white/5 last:border-0"
               >
                 <p className="text-white font-medium text-sm">{p.nombre} {p.apellidos}</p>
-                <p className="text-white/40 text-xs">{p.correo}</p>
+                <p className="text-white/40 text-xs">CURP: {p.curp || "N/A"} | {p.correo}</p>
               </button>
             ))}
           </div>

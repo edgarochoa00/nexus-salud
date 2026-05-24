@@ -52,7 +52,9 @@ export default function SecretariaCitas() {
   };
 
   const handleCancelar = async (id: number, pacienteNombre: string) => {
-    if (!window.confirm(`¿Cancelar la cita de ${pacienteNombre}?`)) return;
+    const motivoSecretaria = window.prompt(`¿Por qué se cancela la cita de ${pacienteNombre}? Este motivo será enviado al doctor y al paciente.`);
+    if (!motivoSecretaria) return;
+
     setErrorMsg(""); setSuccessMsg("");
     
     // 1. Cancelar cita
@@ -60,39 +62,83 @@ export default function SecretariaCitas() {
     
     if (!error) {
       try {
+        const matchingCita = citas.find(c => c.id === id);
+        if (!matchingCita) throw new Error("Cita no encontrada en memoria");
+
+        const fechaCitaObj = new Date(`${matchingCita.fecha}T${matchingCita.hora}`);
+        const ahora = new Date();
+        const diferenciaHoras = (fechaCitaObj.getTime() - ahora.getTime()) / (1000 * 60 * 60);
+        const isLessThan24h = diferenciaHoras < 24;
+
         // 2. Crear la cancelación
         const { data: cancelacionData, error: cancelacionError } = await supabase
           .from("cancelaciones")
           .insert({
             cita_id: id,
-            motivo: "Cancelada por la Secretaria (Reembolso aplicable)",
+            motivo: `Cancelada por la Secretaria: ${motivoSecretaria}`,
             tipo: "admin",
             cancelado_por: "secretaria"
           })
           .select()
           .single();
 
-        if (cancelacionError) {
-          console.error("Error al registrar la cancelación:", cancelacionError);
+        if (cancelacionError) console.error("Error al registrar la cancelación:", cancelacionError);
+
+        // 3. Generar reembolso y retención
+        const pagoInfo = matchingCita.pagos?.[0] || {};
+        const montoTotalPagado = pagoInfo.monto_total || pagoInfo.anticipo || 0; 
+        const anticipo = pagoInfo.anticipo || 0;
+
+        let montoReembolsar = 0;
+        let montoRetenido = 0;
+
+        if (!isLessThan24h) {
+          montoReembolsar = montoTotalPagado;
+          montoRetenido = 0;
+        } else {
+          montoRetenido = anticipo;
+          montoReembolsar = montoTotalPagado > anticipo ? montoTotalPagado - anticipo : 0;
         }
 
-        // 3. Generar reembolso si hay pago asociado
-        const matchingCita = citas.find(c => c.id === id);
-        const pagoInfo = matchingCita?.pagos?.[0];
-        if (cancelacionData && pagoInfo) {
-          const montoReembolso = pagoInfo.monto_total || 0;
-          if (montoReembolso > 0) {
-            await supabase.from("reembolsos").insert({
-              cancelacion_id: cancelacionData.id,
-              monto: montoReembolso,
-              estatus: "pendiente"
-            });
-          }
+        if (montoReembolsar > 0 && cancelacionData) {
+          await supabase.from("reembolsos").insert({
+            cancelacion_id: cancelacionData.id,
+            monto: montoReembolsar,
+            estatus: "pendiente"
+          });
         }
+
+        // 4. Notificaciones
+        if (cancelacionData) {
+          // Notificar al paciente
+          const msgPaciente = isLessThan24h
+            ? `La clínica canceló tu cita del ${matchingCita.fecha} a las ${matchingCita.hora?.slice(0,5)}. Motivo: "${motivoSecretaria}". Por política de cancelación tardía (<24h), se retuvo el anticipo de $${montoRetenido}.`
+            : `La clínica canceló tu cita del ${matchingCita.fecha} a las ${matchingCita.hora?.slice(0,5)}. Motivo: "${motivoSecretaria}". Se procesó tu reembolso de $${montoReembolsar}.`;
+          
+          await supabase.from("notificaciones").insert({
+            mensaje: msgPaciente,
+            tipo: "cancelacion",
+            paciente_id: matchingCita.paciente_id,
+            cancelacion_id: cancelacionData.id
+          });
+
+          // Notificar al doctor
+          const msgDoctor = isLessThan24h
+            ? `Recepción canceló la cita de ${pacienteNombre} del ${matchingCita.fecha} a las ${matchingCita.hora?.slice(0,5)}. Motivo: "${motivoSecretaria}". Al ser <24h, el anticipo de $${montoRetenido} se retiene a tu favor.`
+            : `Recepción canceló la cita de ${pacienteNombre} del ${matchingCita.fecha} a las ${matchingCita.hora?.slice(0,5)}. Motivo: "${motivoSecretaria}". Se reembolsó al paciente.`;
+
+          await supabase.from("notificaciones").insert({
+            mensaje: msgDoctor,
+            tipo: "cancelacion",
+            doctor_id: matchingCita.doctor_id,
+            cancelacion_id: cancelacionData.id
+          });
+        }
+
       } catch (e) {
         console.error(e);
       }
-      setSuccessMsg("✓ Cita cancelada. El paciente recibirá una notificación automática."); 
+      setSuccessMsg("✓ Cita cancelada. Notificaciones enviadas al doctor y al paciente."); 
       fetchCitas();
     } else {
       setErrorMsg(error.message);
