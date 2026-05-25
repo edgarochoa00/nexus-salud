@@ -9,7 +9,6 @@ export default function NuevoPacienteSecretaria() {
   const [formData, setFormData] = useState({
     nombre: "",
     apellidos: "",
-    curp: "",
     correo: "",
     telefono: "",
     curp: "",
@@ -36,7 +35,6 @@ export default function NuevoPacienteSecretaria() {
           password: formData.password,
           fecha_nacimiento: formData.fecha_nacimiento || "2000-01-01",
           telefono: formData.telefono,
-          curp: formData.curp,
         }),
       });
 

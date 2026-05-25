@@ -53,7 +53,7 @@ export default function DoctorPagos() {
             id: c.id,
             fecha: c.fecha,
             hora: c.hora,
-            paciente: c.paciente?.usuarios ? `${c.paciente.usuarios.nombre} ${c.paciente.usuarios.apellidos}` : "Paciente",
+            paciente: (c.paciente as any)?.usuarios ? `${(c.paciente as any).usuarios.nombre} ${(c.paciente as any).usuarios.apellidos}` : "Paciente",
             monto: montoRetenido,
             etiqueta,
             estado: c.estado

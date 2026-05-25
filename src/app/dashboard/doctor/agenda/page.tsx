@@ -8,7 +8,7 @@ export default function DoctorAgenda() {
   const supabase = createClient();
   const [citas, setCitas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtro, setFiltro] = useState<"todas" | "pendiente" | "confirmada" | "completada">("todas");
+  const [filtro, setFiltro] = useState<"todas" | "pendiente" | "confirmada" | "completada" | "cancelada">("todas");
 
   const fetchAgenda = useCallback(async () => {
     setLoading(true);
